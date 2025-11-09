@@ -1,0 +1,295 @@
+version: '3.8'
+
+services:
+  # MySQL Databases
+  mysql-user:
+    image: mysql:8.0
+    container_name: mysql-user-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: user_service_db
+      MYSQL_USER: user_service
+      MYSQL_PASSWORD: user_service_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-user-data:/var/lib/mysql
+      - ./2-services/01-user-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - food-delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-restaurant:
+    image: mysql:8.0
+    container_name: mysql-restaurant-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: restaurant_service_db
+      MYSQL_USER: restaurant_service
+      MYSQL_PASSWORD: restaurant_service_pass
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql-restaurant-data:/var/lib/mysql
+      - ./2-services/02-restaurant-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - food-delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-order:
+    image: mysql:8.0
+    container_name: mysql-order-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: order_service
+      MYSQL_PASSWORD: order_service_pass
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql-order-data:/var/lib/mysql
+      - ./2-services/03-order-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - food-delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-payment:
+    image: mysql:8.0
+    container_name: mysql-payment-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: payment_service_db
+      MYSQL_USER: payment_service
+      MYSQL_PASSWORD: payment_service_pass
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql-payment-data:/var/lib/mysql
+      - ./2-services/04-payment-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - food-delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-driver:
+    image: mysql:8.0
+    container_name: mysql-driver-service
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: driver_service_db
+      MYSQL_USER: driver_service
+      MYSQL_PASSWORD: driver_service_pass
+    ports:
+      - "3311:3306"
+    volumes:
+      - mysql-driver-data:/var/lib/mysql
+      - ./2-services/05-driver-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - food-delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # User Service
+  user-service:
+    build:
+      context: ./2-services/01-user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: mysql-user
+      DB_PORT: 3306
+      DB_USER: user_service
+      DB_PASSWORD: user_service_pass
+      DB_NAME: user_service_db
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 24h
+    ports:
+      - "3001:3001"
+    depends_on:
+      mysql-user:
+        condition: service_healthy
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # Restaurant Service
+  restaurant-service:
+    build:
+      context: ./2-services/02-restaurant-service
+      dockerfile: Dockerfile
+    container_name: restaurant-service
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DB_HOST: mysql-restaurant
+      DB_PORT: 3306
+      DB_USER: restaurant_service
+      DB_PASSWORD: restaurant_service_pass
+      DB_NAME: restaurant_service_db
+    ports:
+      - "3002:3002"
+    depends_on:
+      mysql-restaurant:
+        condition: service_healthy
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # Order Service
+  order-service:
+    build:
+      context: ./2-services/03-order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DB_HOST: mysql-order
+      DB_PORT: 3306
+      DB_USER: order_service
+      DB_PASSWORD: order_service_pass
+      DB_NAME: order_service_db
+      USER_SERVICE_URL: http://user-service:3001
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3002
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      DRIVER_SERVICE_URL: http://driver-service:3005
+    ports:
+      - "3003:3003"
+    depends_on:
+      mysql-order:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      restaurant-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ./2-services/04-payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      DB_HOST: mysql-payment
+      DB_PORT: 3306
+      DB_USER: payment_service
+      DB_PASSWORD: payment_service_pass
+      DB_NAME: payment_service_db
+      ORDER_SERVICE_URL: http://order-service:3003
+    ports:
+      - "3004:3004"
+    depends_on:
+      mysql-payment:
+        condition: service_healthy
+      order-service:
+        condition: service_started
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # Driver Service
+  driver-service:
+    build:
+      context: ./2-services/05-driver-service
+      dockerfile: Dockerfile
+    container_name: driver-service
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DB_HOST: mysql-driver
+      DB_PORT: 3306
+      DB_USER: driver_service
+      DB_PASSWORD: driver_service_pass
+      DB_NAME: driver_service_db
+      ORDER_SERVICE_URL: http://order-service:3003
+    ports:
+      - "3005:3005"
+    depends_on:
+      mysql-driver:
+        condition: service_healthy
+      order-service:
+        condition: service_started
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./1-api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_EXPIRES_IN: 24h
+      USER_SERVICE_URL: http://user-service:3001
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      DRIVER_SERVICE_URL: http://driver-service:3005
+    ports:
+      - "3000:3000"
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - driver-service
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./3-frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - food-delivery-network
+    restart: unless-stopped
+
+networks:
+  food-delivery-network:
+    driver: bridge
+
+volumes:
+  mysql-user-data:
+  mysql-restaurant-data:
+  mysql-order-data:
+  mysql-payment-data:
+  mysql-driver-data:
+
