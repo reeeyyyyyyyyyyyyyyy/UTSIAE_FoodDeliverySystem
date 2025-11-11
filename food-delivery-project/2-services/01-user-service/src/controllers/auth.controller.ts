@@ -49,11 +49,14 @@ export class AuthController {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
-      res.status(201).json({
-        status: 'success',
-        message: 'User registered successfully',
-        data: userWithoutPassword,
-      });
+      // Ensure response is sent properly
+      if (!res.headersSent) {
+        res.status(201).json({
+          status: 'success',
+          message: 'User registered successfully',
+          data: userWithoutPassword,
+        });
+      }
     } catch (error: any) {
       console.error('Register error:', error);
       res.status(500).json({
@@ -66,6 +69,7 @@ export class AuthController {
 
   static async login(req: Request, res: Response): Promise<void> {
     try {
+      console.log(`[${new Date().toISOString()}] Login request received for: ${req.body?.email || 'unknown'}`);
       const { email, password } = req.body;
 
       // Validation
@@ -108,13 +112,17 @@ export class AuthController {
         { expiresIn: JWT_EXPIRES_IN }
       );
 
-      res.json({
-        status: 'success',
-        message: 'Login successful',
-        data: {
-          token,
-        },
-      });
+      // Ensure response is sent properly
+      if (!res.headersSent) {
+        console.log(`[${new Date().toISOString()}] Login successful for: ${email}`);
+        res.status(200).json({
+          status: 'success',
+          message: 'Login successful',
+          data: {
+            token,
+          },
+        });
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       res.status(500).json({

@@ -1,95 +1,54 @@
-import express from 'express';
-import cors from 'cors';
+import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
-import swaggerJsdoc from 'swagger-jsdoc';
+import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
+import { connectToDatabase } from './database/connection'; // Fungsi baru yang di-await
+import { swaggerSpec } from './config/swagger'; // INI SEKARANG AKAN DITEMUKAN
 import orderRoutes from './routes/order.routes';
+import { errorHandler } from './middleware/error.middleware';
 
 dotenv.config();
 
-const app = express();
-const PORT = process.env.PORT || 3003;
+const app: Express = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Swagger configuration
-const swaggerOptions = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Order Service API',
-      version: '1.0.0',
-      description: 'API documentation for Order Service - Food Delivery System',
-    },
-    servers: [
-      {
-        url: `http://localhost:${PORT}`,
-        description: 'Development server',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
-    },
-  },
-  apis: ['./src/routes/*.ts', './src/index.ts'],
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-// Swagger UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Routes
-app.use('/', orderRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    service: 'order-service',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// Health Check
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'healthy', service: 'Order Service' });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Order Service API',
-    version: '1.0.0',
-    documentation: `/api-docs`,
-  });
-});
+// Swagger Docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec)); // INI SEKARANG AMAN
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error stack:', err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Internal server error',
-    error: err.message,
-  });
-});
+// ROUTES
+app.use('/orders', orderRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    status: 'error',
-    message: `Route ${req.method} ${req.path} not found`,
-  });
-});
+// Global Error Handler
+app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Order Service running on port ${PORT}`);
-  console.log(`📚 Swagger docs: http://localhost:${PORT}/api-docs`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-});
+const PORT = process.env.PORT || 3003;
 
+// Fungsi Asynchronous untuk memulai server
+async function startServer() {
+  try {
+    // 1. Hubungkan dan inisialisasi database DULU
+    await connectToDatabase();
+
+    // 2. SETELAH database siap, baru jalankan server
+    app.listen(PORT, () => {
+      console.log(`🚀 Order Service running on port ${PORT}`);
+      console.log(`📚 Swagger docs: http://localhost:${PORT}/api-docs`);
+      console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start Order Service:', error);
+    process.exit(1);
+  }
+}
+
+// Jalankan server
+startServer();

@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS addresses (
 
 -- Insert sample data (optional)
 -- Password: Password123! (hashed with bcrypt)
+-- To generate new hash, run: node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('Password123!', 10).then(hash => console.log(hash));"
 INSERT INTO users (name, email, password, phone, role) VALUES
-('Admin User', 'admin@example.com', '$2a$10$rqFz8K7W7W7W7W7W7W7W7.W7W7W7W7W7W7W7W7W7W7W7W7W7W7', '081234567890', 'admin')
+('Admin User', 'admin@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'admin')
 ON DUPLICATE KEY UPDATE email=email;
 

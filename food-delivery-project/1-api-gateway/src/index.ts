@@ -12,7 +12,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+
+// Request logging middleware (but skip for proxy routes to avoid double logging)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (!req.url.startsWith('/api/')) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl || req.url}`);
+  }
+  next();
+});
 
 // Service URLs
 const services = {
@@ -66,6 +73,8 @@ const createAuthProxy = (serviceUrl: string, serviceName: string) => {
   return createProxyMiddleware({
     target: serviceUrl,
     changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
     pathRewrite: {
       [`^/api/${serviceName}`]: '',
     },
@@ -83,12 +92,18 @@ const createAuthProxy = (serviceUrl: string, serviceName: string) => {
         proxyReq.setHeader('Authorization', req.headers.authorization);
       }
     },
-    onError: (err, req, res) => {
+    onError: (err: any, req, res) => {
       console.error(`Proxy error for ${serviceName}:`, err);
-      (res as Response).status(500).json({
-        error: 'Service unavailable',
-        message: `Failed to connect to ${serviceName}`,
-      });
+      if (err.code === 'ECONNRESET' || err.message?.includes('socket hang up')) {
+        console.warn(`⚠️ Connection reset for ${serviceName}, ignoring...`);
+        return;
+      }
+      if (!(res as Response).headersSent) {
+        (res as Response).status(500).json({
+          error: 'Service unavailable',
+          message: `Failed to connect to ${serviceName}`,
+        });
+      }
     },
   });
 };
@@ -100,22 +115,86 @@ app.use(
   createProxyMiddleware({
     target: services.userService,
     changeOrigin: true,
+    timeout: 2000, // 2 seconds timeout for faster testing
+    proxyTimeout: 2000, // 2 seconds proxy timeout
+    xfwd: true,
+    secure: false,
+    ws: false,
     pathRewrite: {
       '^/api/users/auth/login': '/auth/login',
+    },
+    logLevel: 'debug',
+    onProxyReq: (proxyReq, req) => {
+      const startTime = Date.now();
+      console.log(`[Proxy] ${new Date().toISOString()} - Forwarding ${req.method} ${req.originalUrl || req.url} to ${services.userService}/auth/login`);
+      (req as any).proxyStartTime = startTime;
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
+      console.log(`[Proxy] ${new Date().toISOString()} - Response from ${services.userService}: ${proxyRes.statusCode} (${duration}ms)`);
+      // Remove connection header that might cause issues
+      if (proxyRes.headers) {
+        delete proxyRes.headers.connection;
+      }
+    },
+    onError: (err: any, req, res) => {
+      const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
+      console.error(`[Proxy] ${new Date().toISOString()} - Login proxy error after ${duration}ms:`, err.code || err.message);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Service unavailable. Please check if user service is running.',
+          error: err.message || err.code,
+        });
+      }
     },
   })
 );
 
+// Register route - NO body parser before proxy to avoid consuming stream
 app.use(
   '/api/users/auth/register',
   createProxyMiddleware({
     target: services.userService,
     changeOrigin: true,
+    timeout: 2000,
+    proxyTimeout: 2000,
+    xfwd: true,
+    secure: false,
+    ws: false,
     pathRewrite: {
       '^/api/users/auth/register': '/auth/register',
     },
+    logLevel: 'debug',
+    onProxyReq: (proxyReq, req) => {
+      const startTime = Date.now();
+      console.log(`[Proxy] ${new Date().toISOString()} - Forwarding ${req.method} ${req.originalUrl || req.url} to ${services.userService}/auth/register`);
+      (req as any).proxyStartTime = startTime;
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
+      console.log(`[Proxy] ${new Date().toISOString()} - Response from ${services.userService}: ${proxyRes.statusCode} (${duration}ms)`);
+      if (proxyRes.headers) {
+        delete proxyRes.headers.connection;
+      }
+    },
+    onError: (err: any, req, res) => {
+      const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
+      console.error(`[Proxy] ${new Date().toISOString()} - Register proxy error after ${duration}ms:`, err.code || err.message);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Service unavailable. Please check if user service is running.',
+          error: err.message || err.code,
+        });
+      }
+    },
   })
 );
+
+// Body parser for non-proxy routes (after proxy routes)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Restaurant Service - Public routes (get restaurants, get menu)
 app.use(
@@ -124,7 +203,7 @@ app.use(
     target: services.restaurantService,
     changeOrigin: true,
     pathRewrite: {
-      '^/api/restaurants': '',
+      '^/api/restaurants': '/restaurants',
     },
   })
 );
@@ -138,7 +217,7 @@ app.use(
     target: services.userService,
     changeOrigin: true,
     pathRewrite: {
-      '^/api/users/profile': '/profile',
+      '^/api/users/profile': '/users/profile',
     },
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
@@ -162,7 +241,7 @@ app.use(
     target: services.userService,
     changeOrigin: true,
     pathRewrite: {
-      '^/api/users/addresses': '/addresses',
+      '^/api/users/addresses': '/users/addresses',
     },
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
@@ -198,18 +277,16 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// Root endpoint
+// Root endpoint - MUST BE AFTER PROXY ROUTES
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Food Delivery System API Gateway',
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      userService: '/api/users',
-      restaurantService: '/api/restaurants',
-      orderService: '/api/orders',
-      paymentService: '/api/payments',
-      driverService: '/api/drivers',
+      login: '/api/users/auth/login',
+      register: '/api/users/auth/register',
+      restaurants: '/api/restaurants',
     },
   });
 });
@@ -217,10 +294,12 @@ app.get('/', (req: Request, res: Response) => {
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error stack:', err.stack);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: err.message,
-  });
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err.message,
+    });
+  }
 });
 
 // 404 handler

@@ -95,7 +95,7 @@ export const RestaurantDetail: React.FC = () => {
 
     setError('');
     setSuccess('Item added to cart!');
-    setTimeout(() => setSuccess(''), 2000);
+    setTimeout(() => setSuccess(''), 5000);
   };
 
   const removeFromCart = (menuItemId: number) => {

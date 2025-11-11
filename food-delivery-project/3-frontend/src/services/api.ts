@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 3000, // 3 seconds timeout for faster testing
   headers: {
     'Content-Type': 'application/json',
   },
@@ -27,6 +28,18 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors (no response from server)
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        error.message = 'Request timeout. Please check your connection and try again.';
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        error.message = 'Network error. Please check your connection and ensure the server is running.';
+      } else {
+        error.message = error.message || 'Network error. Please try again.';
+      }
+    }
+    
+    // Handle HTTP errors
     if (error.response?.status === 401) {
       // Token expired or invalid - only redirect if not already on login/register page
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
@@ -35,6 +48,7 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    
     return Promise.reject(error);
   }
 );
@@ -42,12 +56,34 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   register: async (data: { name: string; email: string; password: string; phone?: string }) => {
-    const response = await api.post('/users/auth/register', data);
-    return response.data;
+    try {
+      const response = await api.post('/users/auth/register', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Register API error:', error);
+      // Re-throw with better error message
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Registration request timeout. Please check if the server is running.');
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        throw new Error('Network error. Please check if the API Gateway is running on port 3000.');
+      }
+      throw error;
+    }
   },
   login: async (data: { email: string; password: string }) => {
-    const response = await api.post('/users/auth/login', data);
-    return response.data;
+    try {
+      const response = await api.post('/users/auth/login', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Login API error:', error);
+      // Re-throw with better error message
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        throw new Error('Login request timeout. Please check if the server is running.');
+      } else if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        throw new Error('Network error. Please check if the API Gateway is running on port 3000.');
+      }
+      throw error;
+    }
   },
 };
 

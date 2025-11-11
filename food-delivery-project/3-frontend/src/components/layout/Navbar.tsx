@@ -37,7 +37,9 @@ export const Navbar: React.FC = () => {
                   Profile
                 </Link>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-700 hidden md:inline">Hello, {user?.name}</span>
+                  <br />
+                  <span className="text-gray-700 hidden md:inline">Hello, {user?.name} 👋</span>
+                  <br />
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     Logout
                   </Button>
