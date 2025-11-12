@@ -12,6 +12,8 @@ interface MenuItem {
   price: number;
   stock: number;
   is_available: boolean;
+  category?: string;
+  image_url?: string;
 }
 
 interface CartItem {
@@ -34,6 +36,7 @@ export const RestaurantDetail: React.FC = () => {
   const [isOrdering, setIsOrdering] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -46,7 +49,11 @@ export const RestaurantDetail: React.FC = () => {
         const menuResponse = await restaurantAPI.getRestaurantMenu(parseInt(id!));
         if (menuResponse.status === 'success') {
           setRestaurantName(menuResponse.data.restaurant_name);
-          setMenuItems(menuResponse.data.menu_items || []);
+          // Remove duplicates by id
+          const uniqueMenuItems = (menuResponse.data.menu_items || []).filter((item: MenuItem, index: number, self: MenuItem[]) => 
+            index === self.findIndex((m) => m.id === item.id)
+          );
+          setMenuItems(uniqueMenuItems);
         }
 
         const addressesResponse = await userAPI.getAddresses();
@@ -211,7 +218,24 @@ export const RestaurantDetail: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Menu Items */}
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-semibold text-gray-700 mb-6">Menu</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-700">Menu</h2>
+              <div className="flex gap-2">
+                {['All', 'Makanan', 'Jajanan', 'Add On', 'Minuman'].map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                      selectedCategory === category
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
             
             {error && (
               <motion.div
@@ -239,7 +263,9 @@ export const RestaurantDetail: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {menuItems.map((item, index) => (
+                {menuItems
+                  .filter((item) => selectedCategory === 'All' || item.category === selectedCategory)
+                  .map((item, index) => (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -249,8 +275,22 @@ export const RestaurantDetail: React.FC = () => {
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1">
+                        {item.image_url && (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.name}
+                            className="w-full h-32 object-cover rounded-lg mb-3"
+                          />
+                        )}
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-xl font-semibold text-gray-800">{item.name}</h3>
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-800">{item.name}</h3>
+                            {item.category && (
+                              <span className="text-xs bg-primary-100 text-primary-800 px-2 py-1 rounded mt-1 inline-block">
+                                {item.category}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-primary-600 font-bold text-lg">
                             Rp {item.price.toLocaleString()}
                           </span>

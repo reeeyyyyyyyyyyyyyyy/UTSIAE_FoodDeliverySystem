@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 
 export const Navbar: React.FC = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, isAdmin, isDriver, isCustomer } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,19 +27,33 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <>
-                <Link to="/" className={`hover:text-primary-600 ${isActive('/')}`}>
-                  Restaurants
-                </Link>
-                <Link to="/orders" className={`hover:text-primary-600 ${isActive('/orders')}`}>
-                  My Orders
-                </Link>
+                {isAdmin && (
+                  <Link to="/admin" className={`hover:text-primary-600 ${isActive('/admin')}`}>
+                    Admin Dashboard
+                  </Link>
+                )}
+                {isDriver && (
+                  <Link to="/driver" className={`hover:text-primary-600 ${isActive('/driver')}`}>
+                    Driver Dashboard
+                  </Link>
+                )}
+                {isCustomer && (
+                  <>
+                    <Link to="/browse" className={`hover:text-primary-600 ${isActive('/browse')}`}>
+                      Restaurants
+                    </Link>
+                    <Link to="/orders" className={`hover:text-primary-600 ${isActive('/orders')}`}>
+                      My Orders
+                    </Link>
+                  </>
+                )}
                 <Link to="/profile" className={`hover:text-primary-600 ${isActive('/profile')}`}>
                   Profile
                 </Link>
                 <div className="flex items-center gap-2">
-                  <br />
-                  <span className="text-gray-700 hidden md:inline">Hello, {user?.name} 👋</span>
-                  <br />
+                  <span className="text-gray-700 hidden md:inline">
+                    Hello, {user?.name} {isAdmin && '👑'} {isDriver && '🚗'} 👋
+                  </span>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     Logout
                   </Button>

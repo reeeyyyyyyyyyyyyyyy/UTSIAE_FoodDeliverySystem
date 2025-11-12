@@ -12,6 +12,7 @@ interface Restaurant {
   cuisine_type: string;
   address: string;
   is_open: boolean;
+  image_url?: string;
 }
 
 export const Home: React.FC = () => {
@@ -26,7 +27,11 @@ export const Home: React.FC = () => {
       try {
         const response = await restaurantAPI.getRestaurants(filter || undefined);
         if (response.status === 'success') {
-          setRestaurants(response.data || []);
+          // Remove duplicates by id
+          const uniqueRestaurants = (response.data || []).filter((r: Restaurant, index: number, self: Restaurant[]) => 
+            index === self.findIndex((rest) => rest.id === r.id)
+          );
+          setRestaurants(uniqueRestaurants);
         }
       } catch (error) {
         console.error('Failed to fetch restaurants:', error);
@@ -148,6 +153,13 @@ export const Home: React.FC = () => {
                   className="h-full cursor-pointer hover:shadow-xl transition-shadow"
                 >
                   <div className="p-6">
+                    {restaurant.image_url && (
+                      <img 
+                        src={restaurant.image_url} 
+                        alt={restaurant.name}
+                        className="w-full h-48 object-cover rounded-lg mb-4"
+                      />
+                    )}
                     <div className="flex items-start justify-between mb-4">
                       <h3 className="text-xl font-semibold text-gray-800">
                         {restaurant.name}

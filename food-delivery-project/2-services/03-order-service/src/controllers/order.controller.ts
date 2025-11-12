@@ -226,6 +226,319 @@ export class OrderController {
     }
   }
 
+  // Driver endpoints
+  static async getAvailableOrders(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      // Get orders with status PREPARING (ready for driver pickup)
+      const orders = await OrderModel.findByStatus('PREPARING');
+
+      // Enrich with restaurant and customer details
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            // Get restaurant details
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            // Get customer details
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${order.user_id}`);
+            const customerName = userResponse.data.data.name;
+
+            // Get customer address
+            let customerAddress = 'Unknown';
+            try {
+              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/addresses`, {
+                headers: { Authorization: req.headers.authorization },
+              });
+              const addresses = addressesResponse.data.data;
+              const address = addresses.find((a: any) => a.id === order.address_id);
+              if (address) {
+                customerAddress = address.full_address;
+              }
+            } catch (error) {
+              console.error('Failed to fetch address:', error);
+            }
+
+            // Get order items
+            const orderItems = await OrderModel.findItemsByOrderId(order.id);
+
+            return {
+              order_id: order.id,
+              restaurant_name: restaurantName,
+              customer_name: customerName,
+              customer_address: customerAddress,
+              status: order.status,
+              total_price: order.total_price,
+              created_at: order.created_at,
+              items: orderItems.map((item) => ({
+                menu_item_name: item.menu_item_name,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+            };
+          } catch (error) {
+            console.error('Failed to enrich order:', error);
+            return {
+              order_id: order.id,
+              restaurant_name: 'Unknown',
+              customer_name: 'Unknown',
+              customer_address: 'Unknown',
+              status: order.status,
+              total_price: order.total_price,
+              created_at: order.created_at,
+              items: [],
+            };
+          }
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: enrichedOrders,
+      });
+    } catch (error: any) {
+      console.error('Get available orders error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async acceptOrder(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const driverId = req.user?.id;
+      const orderId = parseInt(req.params.id);
+
+      if (!driverId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      if (!orderId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Order ID is required',
+        });
+        return;
+      }
+
+      const order = await OrderModel.findById(orderId);
+      if (!order) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Order not found',
+        });
+        return;
+      }
+
+      if (order.status !== 'PREPARING') {
+        res.status(400).json({
+          status: 'error',
+          message: 'Order is not available for pickup',
+        });
+        return;
+      }
+
+      if (order.driver_id) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Order already assigned to another driver',
+        });
+        return;
+      }
+
+      // Calculate estimated delivery time (30 minutes from now)
+      const estimatedDeliveryTime = new Date();
+      estimatedDeliveryTime.setMinutes(estimatedDeliveryTime.getMinutes() + 30);
+
+      // Update order status and assign driver
+      await OrderModel.updateStatus(orderId, 'ON_THE_WAY', driverId, estimatedDeliveryTime);
+
+      const updatedOrder = await OrderModel.findById(orderId);
+
+      res.json({
+        status: 'success',
+        message: 'Order accepted successfully',
+        data: {
+          order_id: updatedOrder!.id,
+          status: updatedOrder!.status,
+          driver_id: updatedOrder!.driver_id,
+          estimated_delivery_time: updatedOrder!.estimated_delivery_time,
+        },
+      });
+    } catch (error: any) {
+      console.error('Accept order error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async completeOrder(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const driverId = req.user?.id;
+      const orderId = parseInt(req.params.id);
+
+      if (!driverId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      if (!orderId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Order ID is required',
+        });
+        return;
+      }
+
+      const order = await OrderModel.findById(orderId);
+      if (!order) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Order not found',
+        });
+        return;
+      }
+
+      if (order.driver_id !== driverId) {
+        res.status(403).json({
+          status: 'error',
+          message: 'This order is not assigned to you',
+        });
+        return;
+      }
+
+      if (order.status !== 'ON_THE_WAY') {
+        res.status(400).json({
+          status: 'error',
+          message: 'Order is not in ON_THE_WAY status',
+        });
+        return;
+      }
+
+      // Update order status to DELIVERED
+      await OrderModel.updateStatus(orderId, 'DELIVERED');
+
+      const updatedOrder = await OrderModel.findById(orderId);
+
+      res.json({
+        status: 'success',
+        message: 'Order completed successfully',
+        data: {
+          order_id: updatedOrder!.id,
+          status: updatedOrder!.status,
+        },
+      });
+    } catch (error: any) {
+      console.error('Complete order error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getDriverOrders(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const driverId = req.user?.id;
+
+      if (!driverId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      const orders = await OrderModel.findByDriverId(driverId);
+
+      // Filter only active orders (ON_THE_WAY)
+      const activeOrders = orders.filter((order) => order.status === 'ON_THE_WAY');
+
+      // Enrich with restaurant and customer details
+      const enrichedOrders = await Promise.all(
+        activeOrders.map(async (order) => {
+          try {
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${order.user_id}`);
+            const customerName = userResponse.data.data.name;
+
+            let customerAddress = 'Unknown';
+            try {
+              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/addresses`, {
+                headers: { Authorization: req.headers.authorization },
+              });
+              const addresses = addressesResponse.data.data;
+              const address = addresses.find((a: any) => a.id === order.address_id);
+              if (address) {
+                customerAddress = address.full_address;
+              }
+            } catch (error) {
+              console.error('Failed to fetch address:', error);
+            }
+
+            const orderItems = await OrderModel.findItemsByOrderId(order.id);
+
+            return {
+              order_id: order.id,
+              restaurant_name: restaurantName,
+              customer_name: customerName,
+              customer_address: customerAddress,
+              status: order.status,
+              total_price: order.total_price,
+              estimated_delivery_time: order.estimated_delivery_time,
+              created_at: order.created_at,
+              items: orderItems.map((item) => ({
+                menu_item_name: item.menu_item_name,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+            };
+          } catch (error) {
+            console.error('Failed to enrich order:', error);
+            return {
+              order_id: order.id,
+              restaurant_name: 'Unknown',
+              customer_name: 'Unknown',
+              customer_address: 'Unknown',
+              status: order.status,
+              total_price: order.total_price,
+              estimated_delivery_time: order.estimated_delivery_time,
+              created_at: order.created_at,
+              items: [],
+            };
+          }
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: enrichedOrders,
+      });
+    } catch (error: any) {
+      console.error('Get driver orders error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
   // Internal endpoint for payment service callback
   static async paymentCallback(req: Request, res: Response): Promise<void> {
     try {

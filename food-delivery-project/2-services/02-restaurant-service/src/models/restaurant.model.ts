@@ -6,6 +6,7 @@ export interface Restaurant {
   cuisine_type: string;
   address: string;
   is_open: boolean;
+  image_url?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -18,6 +19,8 @@ export interface MenuItem {
   price: number;
   stock: number;
   is_available: boolean;
+  category?: string;
+  image_url?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -29,7 +32,7 @@ export interface MenuItemCheck {
 
 export class RestaurantModel {
   static async findAll(): Promise<Restaurant[]> {
-    const [rows] = await pool.execute('SELECT * FROM restaurants ORDER BY name ASC');
+    const [rows] = await pool.execute('SELECT DISTINCT * FROM restaurants ORDER BY name ASC');
     return rows as Restaurant[];
   }
 
@@ -43,12 +46,21 @@ export class RestaurantModel {
     const [rows] = await pool.execute('SELECT * FROM restaurants WHERE cuisine_type = ? AND is_open = TRUE ORDER BY name ASC', [cuisineType]);
     return rows as Restaurant[];
   }
+
+  static async create(restaurantData: { name: string; cuisine_type: string; address: string; image_url?: string; is_open?: boolean }): Promise<Restaurant> {
+    const [result] = await pool.execute(
+      'INSERT INTO restaurants (name, cuisine_type, address, image_url, is_open) VALUES (?, ?, ?, ?, ?)',
+      [restaurantData.name, restaurantData.cuisine_type, restaurantData.address, restaurantData.image_url || null, restaurantData.is_open !== undefined ? restaurantData.is_open : true]
+    );
+    const insertId = (result as any).insertId;
+    return this.findById(insertId) as Promise<Restaurant>;
+  }
 }
 
 export class MenuItemModel {
   static async findByRestaurantId(restaurantId: number): Promise<MenuItem[]> {
     const [rows] = await pool.execute(
-      'SELECT * FROM menu_items WHERE restaurant_id = ? AND is_available = TRUE ORDER BY name ASC',
+      'SELECT DISTINCT * FROM menu_items WHERE restaurant_id = ? AND is_available = TRUE ORDER BY name ASC',
       [restaurantId]
     );
     return rows as MenuItem[];
@@ -102,6 +114,24 @@ export class MenuItemModel {
 
   static async increaseStock(menuItemId: number, quantity: number): Promise<void> {
     await pool.execute('UPDATE menu_items SET stock = stock + ?, is_available = TRUE WHERE id = ?', [quantity, menuItemId]);
+  }
+
+  static async create(menuItemData: { restaurant_id: number; name: string; description?: string; price: number; stock: number; category?: string; image_url?: string }): Promise<MenuItem> {
+    const [result] = await pool.execute(
+      'INSERT INTO menu_items (restaurant_id, name, description, price, stock, category, image_url, is_available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        menuItemData.restaurant_id,
+        menuItemData.name,
+        menuItemData.description || null,
+        menuItemData.price,
+        menuItemData.stock,
+        menuItemData.category || 'Makanan',
+        menuItemData.image_url || null,
+        menuItemData.stock > 0,
+      ]
+    );
+    const insertId = (result as any).insertId;
+    return this.findById(insertId) as Promise<MenuItem>;
   }
 }
 

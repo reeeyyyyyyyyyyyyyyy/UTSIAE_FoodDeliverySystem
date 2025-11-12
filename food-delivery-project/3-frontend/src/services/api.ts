@@ -140,6 +140,42 @@ export const paymentAPI = {
   },
 };
 
+// Admin API
+export const adminAPI = {
+  createRestaurant: async (data: { name: string; cuisine_type: string; address: string; image_url?: string; is_open?: boolean }) => {
+    const response = await api.post('/restaurants', data);
+    return response.data;
+  },
+  createMenuItem: async (restaurantId: number, data: { name: string; description?: string; price: number; stock: number; category?: string; image_url?: string }) => {
+    const response = await api.post(`/restaurants/${restaurantId}/menu`, data);
+    return response.data;
+  },
+  restockMenuItem: async (menuItemId: number, quantity: number) => {
+    const response = await api.put(`/restaurants/menu-items/${menuItemId}/stock`, { quantity });
+    return response.data;
+  },
+};
+
+// Driver API
+export const driverAPI = {
+  getAvailableOrders: async () => {
+    const response = await api.get('/orders/available');
+    return response.data;
+  },
+  getMyOrders: async () => {
+    const response = await api.get('/orders/driver/my-orders');
+    return response.data;
+  },
+  acceptOrder: async (orderId: number) => {
+    const response = await api.post(`/orders/${orderId}/accept`);
+    return response.data;
+  },
+  completeOrder: async (orderId: number) => {
+    const response = await api.post(`/orders/${orderId}/complete`);
+    return response.data;
+  },
+};
+
 // Fix: Add simulatePayment to orderAPI for backward compatibility (but use paymentAPI instead)
 export const orderAPIWithPayment = {
   ...orderAPI,

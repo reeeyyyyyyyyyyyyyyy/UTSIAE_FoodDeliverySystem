@@ -6,6 +6,7 @@ interface User {
   name: string;
   email: string;
   phone?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +16,9 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isDriver: boolean;
+  isCustomer: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -148,6 +152,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('user');
   };
 
+  const isAdmin = user?.role === 'admin';
+  const isDriver = user?.role === 'driver';
+  const isCustomer = !isAdmin && !isDriver;
+
   return (
     <AuthContext.Provider
       value={{
@@ -157,6 +165,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         logout,
         isAuthenticated: !!token && !!user,
+        isAdmin,
+        isDriver,
+        isCustomer,
       }}
     >
       {children}

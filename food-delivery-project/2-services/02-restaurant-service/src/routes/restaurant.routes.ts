@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { RestaurantController } from '../controllers/restaurant.controller';
+import { authenticateToken, authorizeAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -41,6 +42,11 @@ router.get('/', RestaurantController.getRestaurants);
  *         description: Restaurant not found
  */
 router.get('/:id/menu', RestaurantController.getRestaurantMenu);
+
+// Admin routes (require authentication and admin role)
+router.post('/', authenticateToken, authorizeAdmin, RestaurantController.createRestaurant);
+router.post('/:id/menu', authenticateToken, authorizeAdmin, RestaurantController.createMenuItem);
+router.put('/menu-items/:id/stock', authenticateToken, authorizeAdmin, RestaurantController.restockMenuItem);
 
 // Internal routes
 router.post('/internal/menu-items/check', RestaurantController.checkMenuItems);

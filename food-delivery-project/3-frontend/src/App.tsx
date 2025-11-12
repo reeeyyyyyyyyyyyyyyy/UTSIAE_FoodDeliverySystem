@@ -9,10 +9,34 @@ import { RestaurantDetail } from './pages/RestaurantDetail';
 import { OrderStatus } from './pages/OrderStatus';
 import { Orders } from './pages/Orders';
 import { Profile } from './pages/Profile';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { DriverDashboard } from './pages/DriverDashboard';
+import { CustomerDashboard } from './pages/CustomerDashboard';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+};
+
+const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAdmin) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
+const DriverRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isDriver } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isDriver) return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
+const CustomerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isCustomer } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isCustomer) return <Navigate to="/" />;
+  return <>{children}</>;
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,6 +66,15 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/"
         element={
+          <ProtectedRoute>
+            <Navbar />
+            <CustomerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/browse"
+        element={
           <>
             <Navbar />
             <Home />
@@ -49,21 +82,39 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <Navbar />
+            <AdminDashboard />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/driver"
+        element={
+          <DriverRoute>
+            <Navbar />
+            <DriverDashboard />
+          </DriverRoute>
+        }
+      />
+      <Route
         path="/restaurants/:id"
         element={
-          <ProtectedRoute>
+          <CustomerRoute>
             <Navbar />
             <RestaurantDetail />
-          </ProtectedRoute>
+          </CustomerRoute>
         }
       />
       <Route
         path="/orders"
         element={
-          <ProtectedRoute>
+          <CustomerRoute>
             <Navbar />
             <Orders />
-          </ProtectedRoute>
+          </CustomerRoute>
         }
       />
       <Route

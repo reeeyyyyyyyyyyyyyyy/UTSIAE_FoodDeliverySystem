@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/order.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { authenticateToken, authorizeDriver } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -79,6 +79,12 @@ router.get('/', authenticateToken, OrderController.getOrders);
  *         description: Order not found
  */
 router.get('/:id', authenticateToken, OrderController.getOrderById);
+
+// Driver routes
+router.get('/available', authenticateToken, authorizeDriver, OrderController.getAvailableOrders);
+router.get('/driver/my-orders', authenticateToken, authorizeDriver, OrderController.getDriverOrders);
+router.post('/:id/accept', authenticateToken, authorizeDriver, OrderController.acceptOrder);
+router.post('/:id/complete', authenticateToken, authorizeDriver, OrderController.completeOrder);
 
 // Internal routes
 router.post('/internal/callback/payment', OrderController.paymentCallback);

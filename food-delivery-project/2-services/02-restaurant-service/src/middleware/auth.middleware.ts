@@ -22,17 +22,19 @@ declare global {
 
 export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   // Also check X-User-Id header (from API Gateway)
   const userId = req.headers['x-user-id'];
   const userEmail = req.headers['x-user-email'] as string;
+  const userRole = req.headers['x-user-role'] as string;
 
   if (userId && userEmail) {
+    // Request comes from API Gateway with user info
     req.user = {
       id: parseInt(userId as string),
       email: userEmail,
-      role: req.headers['x-user-role'] as string,
+      role: userRole,
     };
     next();
     return;
@@ -58,7 +60,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const authorizeDriver = (req: Request, res: Response, next: NextFunction): void => {
+export const authorizeAdmin = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({
       status: 'error',
@@ -67,10 +69,10 @@ export const authorizeDriver = (req: Request, res: Response, next: NextFunction)
     return;
   }
 
-  if (req.user.role !== 'driver') {
+  if (req.user.role !== 'admin') {
     res.status(403).json({
       status: 'error',
-      message: 'Access denied. Driver role required.',
+      message: 'Access denied. Admin role required.',
     });
     return;
   }

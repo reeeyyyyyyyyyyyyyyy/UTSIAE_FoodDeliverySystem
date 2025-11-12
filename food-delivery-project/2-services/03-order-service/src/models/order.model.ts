@@ -82,6 +82,16 @@ export class OrderModel {
     return rows as Order[];
   }
 
+  static async findByStatus(status: string): Promise<Order[]> {
+    const [rows] = await pool.execute('SELECT * FROM orders WHERE status = ? ORDER BY created_at ASC', [status]);
+    return rows as Order[];
+  }
+
+  static async findByDriverId(driverId: number): Promise<Order[]> {
+    const [rows] = await pool.execute('SELECT * FROM orders WHERE driver_id = ? ORDER BY created_at DESC', [driverId]);
+    return rows as Order[];
+  }
+
   static async findItemsByOrderId(orderId: number): Promise<OrderItem[]> {
     const [rows] = await pool.execute('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
     return rows as OrderItem[];

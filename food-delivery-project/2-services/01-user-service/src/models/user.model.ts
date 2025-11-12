@@ -41,8 +41,8 @@ export interface AddressInput {
 export class UserModel {
   static async create(userData: UserInput): Promise<User> {
     const [result] = await pool.execute(
-      'INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)',
-      [userData.name, userData.email, userData.password, userData.phone || null]
+      'INSERT INTO users (name, email, password, phone, role) VALUES (?, ?, ?, ?, ?)',
+      [userData.name, userData.email, userData.password, userData.phone || null, 'customer']
     );
     const insertId = (result as any).insertId;
     return this.findById(insertId);

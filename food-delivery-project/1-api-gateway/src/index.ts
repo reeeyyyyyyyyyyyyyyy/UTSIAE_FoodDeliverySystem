@@ -197,13 +197,97 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Restaurant Service - Public routes (get restaurants, get menu)
-app.use(
+app.get(
   '/api/restaurants',
   createProxyMiddleware({
     target: services.restaurantService,
     changeOrigin: true,
     pathRewrite: {
       '^/api/restaurants': '/restaurants',
+    },
+  })
+);
+
+app.get(
+  '/api/restaurants/:id/menu',
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+  })
+);
+
+// Restaurant Service - Admin routes (require authentication and admin role)
+app.post(
+  '/api/restaurants',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.post(
+  '/api/restaurants/:id/menu',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.put(
+  '/api/restaurants/menu-items/:id/stock',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
     },
   })
 );
@@ -258,8 +342,185 @@ app.use(
   })
 );
 
-// Order Service - All routes require authentication
-app.use('/api/orders', authenticateJWT, createAuthProxy(services.orderService, 'orders'));
+// Order Service - Customer routes (create order, get orders, get order by id)
+app.post(
+  '/api/orders',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Order proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Order service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+// Order Service - Driver routes (available orders, accept, complete)
+app.get(
+  '/api/orders/available',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/driver/my-orders',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.post(
+  '/api/orders/:id/accept',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.post(
+  '/api/orders/:id/complete',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
 
 // Payment Service - All routes require authentication
 app.use('/api/payments', authenticateJWT, createAuthProxy(services.paymentService, 'payments'));
