@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS addresses (
 -- Password: Password123! (hashed with bcrypt)
 -- To generate new hash, run: node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('Password123!', 10).then(hash => console.log(hash));"
 INSERT INTO users (name, email, password, phone, role) VALUES
-('Admin User', 'admin@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'admin')
+('Admin User', 'admin@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'admin'),
+('Driver One', 'driver1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567891', 'driver'),
+('Driver Two', 'driver2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567892', 'driver'),
+('Customer One', 'customer1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567893', 'customer'),
+('Customer Two', 'customer2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567894', 'customer'),
+('Customer Three', 'customer3@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567895', 'customer')
 ON DUPLICATE KEY UPDATE email=email;
 

@@ -161,23 +161,8 @@ export const RestaurantDetail: React.FC = () => {
         const orderId = response.data.order_id;
         const paymentId = response.data.payment_id;
 
-        // Simulate payment
-        try {
-          await paymentAPI.simulatePayment({
-            order_id: orderId,
-            payment_id: paymentId,
-            payment_method: 'E-Wallet',
-          });
-
-          setSuccess('Order placed successfully! Redirecting...');
-          setTimeout(() => {
-            navigate(`/orders/${orderId}`);
-          }, 1500);
-        } catch (paymentError: any) {
-          console.error('Payment error:', paymentError);
-          // Still navigate to order page even if payment simulation fails
-          navigate(`/orders/${orderId}`);
-        }
+        // Redirect to payment page instead of simulating payment immediately
+        navigate(`/payment/${orderId}?payment_id=${paymentId}`);
       }
     } catch (error: any) {
       console.error('Order error:', error);

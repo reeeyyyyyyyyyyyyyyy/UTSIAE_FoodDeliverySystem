@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
@@ -7,6 +7,7 @@ export const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated, isAdmin, isDriver, isCustomer } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -28,9 +29,67 @@ export const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <>
                 {isAdmin && (
-                  <Link to="/admin" className={`hover:text-primary-600 ${isActive('/admin')}`}>
-                    Admin Dashboard
-                  </Link>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAdminMenu(!showAdminMenu)}
+                      className={`hover:text-primary-600 ${isActive('/admin') || isActive('/admin/restaurants') || isActive('/admin/users') || isActive('/admin/drivers') || isActive('/admin/salaries') || isActive('/admin/statistics') || isActive('/admin/orders') ? 'text-primary-600 font-semibold' : 'text-gray-700'}`}
+                    >
+                      Admin Menu ▼
+                    </button>
+                    {showAdminMenu && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <Link
+                          to="/admin"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          📊 Dashboard
+                        </Link>
+                        <Link
+                          to="/admin/restaurants"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          🍽️ Manage Restaurants
+                        </Link>
+                        <Link
+                          to="/admin/users"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          👥 Manage Users
+                        </Link>
+                        <Link
+                          to="/admin/drivers"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          🚗 Track Drivers
+                        </Link>
+                        <Link
+                          to="/admin/salaries"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          💰 Driver Salaries
+                        </Link>
+                        <Link
+                          to="/admin/statistics"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          📈 Sales Statistics
+                        </Link>
+                        <Link
+                          to="/admin/orders"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          📦 Track Orders
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {isDriver && (
                   <Link to="/driver" className={`hover:text-primary-600 ${isActive('/driver')}`}>
@@ -76,7 +135,12 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+      {showAdminMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowAdminMenu(false)}
+        />
+      )}
     </nav>
   );
 };
-

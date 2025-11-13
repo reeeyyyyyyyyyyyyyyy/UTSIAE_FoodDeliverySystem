@@ -12,7 +12,14 @@ const DRIVER_SERVICE_URL = process.env.DRIVER_SERVICE_URL || 'http://localhost:3
 export class OrderService {
   static async validateUser(userId: number): Promise<any> {
     try {
-      const response = await axios.get(`${USER_SERVICE_URL}/internal/users/${userId}`);
+      // SOA Communication: Order Service calls User Service to validate user
+      // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
+      const response = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${userId}`, {
+        timeout: 5000,
+      });
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error('Invalid response from User Service');
+      }
       return response.data.data;
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
@@ -24,13 +31,19 @@ export class OrderService {
 
   static async validateRestaurantAndMenu(restaurantId: number, items: Array<{ menu_item_id: number; quantity: number }>): Promise<{ restaurant: any; menuItems: any[] }> {
     try {
-      // Get restaurant menu
-      const menuResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${restaurantId}/menu`);
+      // Get restaurant menu (SOA: Order Service calls Restaurant Service)
+      // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+      const menuResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${restaurantId}/menu`, {
+        timeout: 5000,
+      });
       const menuData = menuResponse.data.data;
       const restaurant = { name: menuData.restaurant_name, id: restaurantId };
 
-      // Check stock
-      const stockCheckResponse = await axios.post(`${RESTAURANT_SERVICE_URL}/internal/menu-items/check`, { items });
+      // Check stock (SOA: Order Service calls Restaurant Service internal endpoint)
+      // Path: /restaurants/internal/menu-items/check (because restaurantRoutes is mounted at /restaurants)
+      const stockCheckResponse = await axios.post(`${RESTAURANT_SERVICE_URL}/restaurants/internal/menu-items/check`, { items }, {
+        timeout: 5000,
+      });
       if (stockCheckResponse.data.status !== 'success') {
         throw new Error(stockCheckResponse.data.message || 'Stock check failed');
       }
@@ -64,7 +77,11 @@ export class OrderService {
 
   static async decreaseStock(items: Array<{ menu_item_id: number; quantity: number }>): Promise<void> {
     try {
-      await axios.post(`${RESTAURANT_SERVICE_URL}/internal/menu-items/decrease-stock`, { items });
+      // SOA: Order Service calls Restaurant Service internal endpoint
+      // Path: /restaurants/internal/menu-items/decrease-stock (because restaurantRoutes is mounted at /restaurants)
+      await axios.post(`${RESTAURANT_SERVICE_URL}/restaurants/internal/menu-items/decrease-stock`, { items }, {
+        timeout: 5000,
+      });
     } catch (error: any) {
       throw new Error(`Failed to decrease stock: ${error.message}`);
     }
@@ -114,42 +131,36 @@ export class OrderService {
     // Step 6: Update order with payment_id
     await OrderModel.updatePaymentId(order.id, paymentId);
 
-    // Step 7: Decrease stock (after payment is created)
-    await this.decreaseStock(orderData.items);
+    // NOTE: Stock will be decreased after payment success in handlePaymentCallback
+    // This ensures stock is only reduced when payment is confirmed (SOA principle)
 
     return { order, paymentId };
   }
 
   static async handlePaymentCallback(orderId: number, paymentStatus: string): Promise<void> {
     if (paymentStatus === 'SUCCESS') {
-      // Update order status to PAID
-      await OrderModel.updateStatus(orderId, 'PAID');
-
-      // Trigger driver assignment
-      try {
-        const driverResponse = await axios.post(`${DRIVER_SERVICE_URL}/internal/drivers/assign`, {
-          order_id: orderId,
-        });
-        
-        if (driverResponse.data.status === 'success') {
-          const driver = driverResponse.data.data;
-          // Calculate estimated delivery time (30 minutes from now)
-          const estimatedDeliveryTime = new Date();
-          estimatedDeliveryTime.setMinutes(estimatedDeliveryTime.getMinutes() + 30);
-          
-          // Update order with driver and estimated delivery time
-          await OrderModel.updateStatus(orderId, 'PREPARING', driver.id || driver.driver_id, estimatedDeliveryTime);
-          
-          // After a delay, update to ON_THE_WAY (simulating preparation time)
-          setTimeout(async () => {
-            await OrderModel.updateStatus(orderId, 'ON_THE_WAY');
-          }, 5000); // 5 seconds delay for demo
-        }
-      } catch (error: any) {
-        console.error('Failed to assign driver:', error.message);
-        // If driver assignment fails, set status to PREPARING
-        await OrderModel.updateStatus(orderId, 'PREPARING');
+      // Step 1: Get order to get items for stock decrease
+      const order = await OrderModel.findById(orderId);
+      if (!order) {
+        throw new Error('Order not found');
       }
+
+      // Step 2: Get order items to decrease stock
+      const orderItems = await OrderModel.findItemsByOrderId(orderId);
+      const itemsToDecrease = orderItems.map(item => ({
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+      }));
+
+      // Step 3: Decrease stock (SOA: Order Service calls Restaurant Service)
+      await this.decreaseStock(itemsToDecrease);
+
+      // Step 4: Update order status to PREPARING (so it appears in driver dashboard)
+      await OrderModel.updateStatus(orderId, 'PREPARING');
+
+      // Step 5: Order will be available for drivers to accept
+      // Drivers can see orders with status 'PREPARING' in their dashboard
+      // Admin can track which driver accepts the order
     } else {
       // Payment failed, update order status
       await OrderModel.updateStatus(orderId, 'PAYMENT_FAILED');

@@ -92,6 +92,11 @@ export class OrderModel {
     return rows as Order[];
   }
 
+  static async findByDriverIdInternal(driverId: number): Promise<Order[]> {
+    const [rows] = await pool.execute('SELECT * FROM orders WHERE driver_id = ? ORDER BY created_at DESC', [driverId]);
+    return rows as Order[];
+  }
+
   static async findItemsByOrderId(orderId: number): Promise<OrderItem[]> {
     const [rows] = await pool.execute('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
     return rows as OrderItem[];
@@ -116,6 +121,76 @@ export class OrderModel {
   static async updatePaymentId(id: number, paymentId: number): Promise<Order | null> {
     await pool.execute('UPDATE orders SET payment_id = ? WHERE id = ?', [paymentId, id]);
     return this.findById(id);
+  }
+
+  // Admin statistics methods
+  static async getSalesStatistics(startDate?: Date, endDate?: Date): Promise<any> {
+    let query = `
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as total_orders,
+        SUM(total_price) as total_revenue,
+        AVG(total_price) as avg_order_value
+      FROM orders
+      WHERE status = 'DELIVERED'
+    `;
+    const params: any[] = [];
+
+    if (startDate && endDate) {
+      query += ' AND created_at BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    } else if (startDate) {
+      query += ' AND created_at >= ?';
+      params.push(startDate);
+    } else if (endDate) {
+      query += ' AND created_at <= ?';
+      params.push(endDate);
+    }
+
+    query += ' GROUP BY DATE(created_at) ORDER BY date DESC LIMIT 30';
+
+    const [rows] = await pool.execute(query, params);
+    return rows;
+  }
+
+  static async getRestaurantSales(restaurantId?: number): Promise<any> {
+    let query = `
+      SELECT 
+        restaurant_id,
+        COUNT(*) as total_orders,
+        SUM(total_price) as total_revenue,
+        AVG(total_price) as avg_order_value
+      FROM orders
+      WHERE status = 'DELIVERED'
+    `;
+    const params: any[] = [];
+
+    if (restaurantId) {
+      query += ' AND restaurant_id = ?';
+      params.push(restaurantId);
+    }
+
+    query += ' GROUP BY restaurant_id ORDER BY total_revenue DESC';
+
+    const [rows] = await pool.execute(query, params);
+    return rows;
+  }
+
+  static async getAllOrders(limit: number = 100, offset: number = 0): Promise<Order[]> {
+    const [rows] = await pool.execute('SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+    return rows as Order[];
+  }
+
+  static async getTotalRevenue(): Promise<number> {
+    const [rows] = await pool.execute("SELECT SUM(total_price) as total FROM orders WHERE status = 'DELIVERED'");
+    const result = rows as any[];
+    return result[0]?.total || 0;
+  }
+
+  static async getTotalOrders(): Promise<number> {
+    const [rows] = await pool.execute('SELECT COUNT(*) as total FROM orders');
+    const result = rows as any[];
+    return result[0]?.total || 0;
   }
 }
 

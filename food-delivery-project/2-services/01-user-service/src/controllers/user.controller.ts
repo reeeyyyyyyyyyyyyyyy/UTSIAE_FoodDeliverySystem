@@ -168,5 +168,90 @@ export class UserController {
       });
     }
   }
+
+  // Admin endpoints
+  static async getAllUsers(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+      const users = await UserModel.findAll(limit, offset);
+
+      // Get addresses for each user
+      const usersWithAddresses = await Promise.all(
+        users.map(async (user) => {
+          const addresses = await AddressModel.findByUserId(user.id);
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            role: user.role,
+            addresses: addresses.map((addr) => ({
+              id: addr.id,
+              label: addr.label,
+              full_address: addr.full_address,
+              is_default: addr.is_default,
+            })),
+            created_at: user.created_at,
+          };
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: usersWithAddresses,
+      });
+    } catch (error: any) {
+      console.error('Get all users error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getUserPurchaseHistory(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = parseInt(req.params.id);
+
+      if (!userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'User ID is required',
+        });
+        return;
+      }
+
+      // Get user orders from order service
+      const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:3003';
+      const axios = require('axios');
+
+      try {
+        const ordersResponse = await axios.get(`${ORDER_SERVICE_URL}/internal/orders/user/${userId}`, {
+          headers: { Authorization: req.headers.authorization },
+        });
+
+        res.json({
+          status: 'success',
+          data: ordersResponse.data.data || [],
+        });
+      } catch (error: any) {
+        console.error('Failed to fetch orders:', error);
+        res.json({
+          status: 'success',
+          data: [],
+        });
+      }
+    } catch (error: any) {
+      console.error('Get user purchase history error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
 }
 

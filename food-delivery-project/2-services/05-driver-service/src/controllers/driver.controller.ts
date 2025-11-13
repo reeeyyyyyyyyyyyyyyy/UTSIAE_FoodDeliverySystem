@@ -27,49 +27,79 @@ export class DriverController {
       const enrichedDrivers = await Promise.all(
         drivers.map(async (driver) => {
           try {
-            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${driver.user_id}`);
+            // SOA Communication: Driver Service calls User Service to get user data
+            // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`, {
+              timeout: 5000,
+            });
+            
+            if (!userResponse.data || userResponse.data.status !== 'success') {
+              throw new Error('Invalid response from User Service');
+            }
+            
             const userData = userResponse.data.data;
+            console.log(`✅ Fetched user data for driver ${driver.id}, user_id ${driver.user_id}:`, {
+              name: userData.name,
+              email: userData.email,
+              phone: userData.phone,
+            });
 
-            // Get driver's active orders
-            let activeOrders = 0;
+            // SOA Communication: Driver Service calls Order Service to get active orders
+            let activeOrders: any[] = [];
             try {
               const ordersResponse = await axios.get(`${ORDER_SERVICE_URL}/internal/orders/driver/${driver.id}`, {
                 headers: { Authorization: req.headers.authorization },
+                timeout: 5000,
               });
-              activeOrders = ordersResponse.data.data?.filter((o: any) => o.status === 'ON_THE_WAY').length || 0;
+              const allOrders = ordersResponse.data.data || [];
+              activeOrders = allOrders.filter((o: any) => 
+                o.status === 'ON_THE_WAY' || o.status === 'PREPARING'
+              );
             } catch (error) {
-              console.error('Failed to fetch driver orders:', error);
+              console.error(`⚠️  Failed to fetch driver orders for driver ${driver.id}:`, error);
             }
 
             return {
               id: driver.id,
               user_id: driver.user_id,
-              name: userData.name,
-              email: userData.email,
-              phone: userData.phone || '',
+              name: userData.name || `Driver ${driver.id}`,
+              email: userData.email || '',
+              phone: userData.phone || '-', // Use '-' instead of empty string for better UX
               license_number: driver.vehicle_number, // Map vehicle_number to license_number for frontend
               vehicle_type: driver.vehicle_type,
               vehicle_number: driver.vehicle_number,
               is_available: driver.is_available,
               is_on_job: driver.is_on_job,
               total_earnings: driver.total_earnings,
-              active_orders: activeOrders,
+              active_orders: activeOrders.length,
+              active_orders_details: activeOrders.map((o: any) => ({
+                order_id: o.id,
+                customer_name: o.customer_name || 'Unknown',
+                restaurant_name: o.restaurant_name || 'Unknown',
+                status: o.status,
+                total_price: o.total_price,
+                created_at: o.created_at,
+              })),
               created_at: driver.created_at,
             };
-          } catch (error) {
+          } catch (error: any) {
+            console.error(`❌ Failed to fetch user data for driver ${driver.id}, user_id ${driver.user_id}:`, error.message);
+            console.error(`   User Service URL: ${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`);
+            // Fallback: return driver data without user enrichment
             return {
               id: driver.id,
               user_id: driver.user_id,
-              name: 'Unknown',
-              email: 'Unknown',
-              phone: '',
-              license_number: driver.vehicle_number, // Map vehicle_number to license_number for frontend
+              name: `Driver ${driver.id}`, // Better fallback than "Unknown"
+              email: '',
+              phone: '-', // Use '-' instead of empty string
+              license_number: driver.vehicle_number,
               vehicle_type: driver.vehicle_type,
               vehicle_number: driver.vehicle_number,
               is_available: driver.is_available,
               is_on_job: driver.is_on_job,
               total_earnings: driver.total_earnings,
               active_orders: 0,
+              active_orders_details: [],
               created_at: driver.created_at,
             };
           }
@@ -115,15 +145,28 @@ export class DriverController {
               };
             }
 
-            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${driver.user_id}`);
+            // SOA Communication: Driver Service calls User Service to get driver name
+            // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`, {
+              timeout: 5000,
+            });
+            
+            if (!userResponse.data || userResponse.data.status !== 'success') {
+              throw new Error('Invalid response from User Service');
+            }
+            
             const userData = userResponse.data.data;
+            console.log(`✅ Fetched user data for salary driver_id ${salary.driver_id}, user_id ${driver.user_id}:`, {
+              name: userData.name,
+              email: userData.email,
+            });
 
             return {
               id: salary.id,
               driver_id: salary.driver_id,
-              driver_name: userData.name,
-              driver_email: userData.email,
-              amount: parseFloat(salary.base_salary) + parseFloat(salary.commission.toString()),
+              driver_name: userData.name || `Driver ${salary.driver_id}`,
+              driver_email: userData.email || '',
+              amount: parseFloat(salary.base_salary.toString()) + parseFloat(salary.commission.toString()),
               period: `${salary.year}-${String(salary.month).padStart(2, '0')}`,
               month: salary.month,
               year: salary.year,
@@ -134,11 +177,14 @@ export class DriverController {
               status: salary.status,
               created_at: salary.created_at,
             };
-          } catch (error) {
+          } catch (error: any) {
+            console.error(`❌ Failed to fetch user data for salary driver_id ${salary.driver_id}:`, error.message);
+            console.error(`   User Service URL: ${USER_SERVICE_URL}/users/internal/users/${driver?.user_id || 'N/A'}`);
             return {
               id: salary.id,
               driver_id: salary.driver_id,
-              driver_name: 'Unknown',
+              driver_name: `Driver ${salary.driver_id}`, // Better fallback
+              driver_email: '',
               amount: parseFloat(salary.base_salary.toString()) + parseFloat(salary.commission.toString()),
               period: `${salary.year}-${String(salary.month).padStart(2, '0')}`,
               status: salary.status,
@@ -164,35 +210,45 @@ export class DriverController {
 
   static async createDriverSalary(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { driver_id, amount, period, month, year, base_salary, commission } = req.body;
+      const { driver_id, period } = req.body;
 
-      // Support both formats: period (YYYY-MM) or month/year
-      let salaryMonth: number;
-      let salaryYear: number;
-      let salaryAmount: number;
-
-      if (period) {
-        // Parse period format: "YYYY-MM"
-        const [yearStr, monthStr] = period.split('-');
-        salaryYear = parseInt(yearStr);
-        salaryMonth = parseInt(monthStr);
-        salaryAmount = amount ? parseFloat(amount) : 0;
-      } else if (month && year) {
-        salaryMonth = parseInt(month);
-        salaryYear = parseInt(year);
-        salaryAmount = base_salary ? parseFloat(base_salary) : 0;
-      } else {
+      if (!driver_id || !period) {
         res.status(400).json({
           status: 'error',
-          message: 'driver_id and period (YYYY-MM) or (month, year) are required',
+          message: 'driver_id and period (YYYY-MM) are required',
         });
         return;
       }
 
-      if (!driver_id) {
+      // Parse period format: "YYYY-MM"
+      const parts = period.split('-');
+      if (parts.length !== 2) {
         res.status(400).json({
           status: 'error',
-          message: 'driver_id is required',
+          message: 'Invalid period format. Use YYYY-MM',
+        });
+        return;
+      }
+      const salaryYear = parseInt(parts[0]);
+      const salaryMonth = parseInt(parts[1]);
+
+      if (isNaN(salaryYear) || isNaN(salaryMonth) || salaryMonth < 1 || salaryMonth > 12) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Invalid period. Month must be 01-12',
+        });
+        return;
+      }
+
+      // Check if salary already exists for this driver and period
+      const existingSalaries = await DriverSalaryModel.findByDriverId(parseInt(driver_id));
+      const existing = existingSalaries.find(
+        (s) => s.year === salaryYear && s.month === salaryMonth
+      );
+      if (existing) {
+        res.status(400).json({
+          status: 'error',
+          message: `Salary for period ${period} already exists for this driver`,
         });
         return;
       }
@@ -201,7 +257,16 @@ export class DriverController {
       let totalOrders = 0;
       let totalEarnings = 0;
       try {
-        const ordersResponse = await axios.get(`${ORDER_SERVICE_URL}/internal/orders/driver/${driver_id}`, {
+        const driver = await DriverModel.findById(parseInt(driver_id));
+        if (!driver) {
+          res.status(404).json({
+            status: 'error',
+            message: 'Driver not found',
+          });
+          return;
+        }
+
+        const ordersResponse = await axios.get(`${ORDER_SERVICE_URL}/internal/orders/driver/${driver.id}`, {
           headers: { Authorization: req.headers.authorization },
         });
         const orders = ordersResponse.data.data || [];
@@ -218,9 +283,9 @@ export class DriverController {
         console.error('Failed to fetch driver orders:', error);
       }
 
-      // Calculate base_salary and commission from amount
-      const baseSalary = salaryAmount * 0.8; // 80% base salary
-      const commissionAmount = commission ? parseFloat(commission) : (salaryAmount * 0.2); // 20% commission or provided
+      // Fixed salary calculation: base salary 2,000,000 + commission (10% of total earnings)
+      const baseSalary = 2000000; // Fixed base salary
+      const commissionAmount = totalEarnings * 0.1; // 10% commission from earnings
 
       const salary = await DriverSalaryModel.create({
         driver_id: parseInt(driver_id),
@@ -235,10 +300,13 @@ export class DriverController {
       // Return enriched salary data
       const driver = await DriverModel.findById(salary.driver_id);
       let driverName = 'Unknown';
+      let driverEmail = '';
       if (driver) {
         try {
-          const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${driver.user_id}`);
-          driverName = userResponse.data.data?.name || 'Unknown';
+          const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`);
+          const userData = userResponse.data.data;
+          driverName = userData?.name || 'Unknown';
+          driverEmail = userData?.email || '';
         } catch (error) {
           console.error('Failed to fetch driver user:', error);
         }
@@ -251,6 +319,7 @@ export class DriverController {
           id: salary.id,
           driver_id: salary.driver_id,
           driver_name: driverName,
+          driver_email: driverEmail,
           amount: parseFloat(salary.base_salary.toString()) + parseFloat(salary.commission.toString()),
           period: `${salary.year}-${String(salary.month).padStart(2, '0')}`,
           status: salary.status,
@@ -294,7 +363,7 @@ export class DriverController {
       let driverName = 'Unknown';
       if (driver) {
         try {
-          const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${driver.user_id}`);
+          const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`);
           driverName = userResponse.data.data?.name || 'Unknown';
         } catch (error) {
           console.error('Failed to fetch driver user:', error);

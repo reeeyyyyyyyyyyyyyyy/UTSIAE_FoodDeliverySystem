@@ -21,6 +21,16 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', service: 'Order Service' });
 });
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'success',
+    message: 'Order Service is running',
+    service: 'Order Service',
+    version: '1.0.0'
+  });
+});
+
 // Swagger Docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec)); // INI SEKARANG AMAN
 

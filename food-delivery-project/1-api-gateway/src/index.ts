@@ -21,6 +21,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// NOTE: Body parser middleware is now applied per-route (before proxy middleware)
+// to ensure proper SOA communication - each route that needs body parsing
+// will have express.json() middleware before its proxy middleware
+
 // Service URLs
 const services = {
   userService: process.env.USER_SERVICE_URL || 'http://localhost:3001',
@@ -99,10 +103,10 @@ const createAuthProxy = (serviceUrl: string, serviceName: string) => {
         return;
       }
       if (!(res as Response).headersSent) {
-        (res as Response).status(500).json({
-          error: 'Service unavailable',
-          message: `Failed to connect to ${serviceName}`,
-        });
+      (res as Response).status(500).json({
+        error: 'Service unavailable',
+        message: `Failed to connect to ${serviceName}`,
+      });
       }
     },
   });
@@ -110,13 +114,15 @@ const createAuthProxy = (serviceUrl: string, serviceName: string) => {
 
 // Public routes (no authentication required)
 // User Service - Auth routes (register, login) - MUST BE FIRST AND MOST SPECIFIC
+// IMPORTANT: NO body parser middleware before these routes to avoid consuming request stream
 app.use(
   '/api/users/auth/login',
+  express.json({ limit: '10mb' }), // Parse JSON body for login
   createProxyMiddleware({
     target: services.userService,
     changeOrigin: true,
-    timeout: 2000, // 2 seconds timeout for faster testing
-    proxyTimeout: 2000, // 2 seconds proxy timeout
+    timeout: 10000, // 10 seconds timeout
+    proxyTimeout: 10000, // 10 seconds proxy timeout
     xfwd: true,
     secure: false,
     ws: false,
@@ -128,6 +134,15 @@ app.use(
       const startTime = Date.now();
       console.log(`[Proxy] ${new Date().toISOString()} - Forwarding ${req.method} ${req.originalUrl || req.url} to ${services.userService}/auth/login`);
       (req as any).proxyStartTime = startTime;
+      
+      // Write JSON body if it exists (already parsed by express.json above)
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        (req as any).bodyParsed = true; // Mark as parsed to avoid duplicate parsing
+      }
     },
     onProxyRes: (proxyRes, req, res) => {
       const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
@@ -151,14 +166,15 @@ app.use(
   })
 );
 
-// Register route - NO body parser before proxy to avoid consuming stream
+// Register route - Parse JSON body before proxy
 app.use(
   '/api/users/auth/register',
+  express.json({ limit: '10mb' }), // Parse JSON body for register
   createProxyMiddleware({
     target: services.userService,
     changeOrigin: true,
-    timeout: 2000,
-    proxyTimeout: 2000,
+    timeout: 10000, // 10 seconds timeout
+    proxyTimeout: 10000, // 10 seconds proxy timeout
     xfwd: true,
     secure: false,
     ws: false,
@@ -170,6 +186,15 @@ app.use(
       const startTime = Date.now();
       console.log(`[Proxy] ${new Date().toISOString()} - Forwarding ${req.method} ${req.originalUrl || req.url} to ${services.userService}/auth/register`);
       (req as any).proxyStartTime = startTime;
+      
+      // Write JSON body if it exists (already parsed by express.json above)
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        (req as any).bodyParsed = true; // Mark as parsed to avoid duplicate parsing
+      }
     },
     onProxyRes: (proxyRes, req, res) => {
       const duration = Date.now() - ((req as any).proxyStartTime || Date.now());
@@ -192,9 +217,28 @@ app.use(
   })
 );
 
-// Body parser for non-proxy routes (after proxy routes)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parser for non-proxy routes (after proxy routes) - only for non-multipart
+// This is for routes that don't use proxy middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Skip if already parsed (for proxy routes that have their own body parser)
+  if ((req as any).bodyParsed) {
+    return next();
+  }
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    return next();
+  }
+  express.json({ limit: '10mb' })(req, res, next);
+});
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if ((req as any).bodyParsed) {
+    return next();
+  }
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    return next();
+  }
+  express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+});
 
 // Restaurant Service - Public routes (get restaurants, get menu)
 app.get(
@@ -202,8 +246,20 @@ app.get(
   createProxyMiddleware({
     target: services.restaurantService,
     changeOrigin: true,
+    timeout: 10000,
+    proxyTimeout: 10000,
     pathRewrite: {
       '^/api/restaurants': '/restaurants',
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
     },
   })
 );
@@ -213,13 +269,26 @@ app.get(
   createProxyMiddleware({
     target: services.restaurantService,
     changeOrigin: true,
+    timeout: 10000,
+    proxyTimeout: 10000,
     pathRewrite: {
       '^/api/restaurants': '/restaurants',
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant menu proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
     },
   })
 );
 
 // Restaurant Service - Admin routes (require authentication and admin role)
+// Note: For multipart/form-data, we don't use express.json() middleware
 app.post(
   '/api/restaurants',
   authenticateJWT,
@@ -240,6 +309,18 @@ app.post(
       if (req.headers.authorization) {
         proxyReq.setHeader('Authorization', req.headers.authorization);
       }
+      // For multipart/form-data, preserve the Content-Type header with boundary
+      // Don't modify it - let the original request headers pass through
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant create proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
     },
   })
 );
@@ -264,12 +345,138 @@ app.post(
       if (req.headers.authorization) {
         proxyReq.setHeader('Authorization', req.headers.authorization);
       }
+      // For multipart/form-data, preserve the Content-Type header with boundary
+      // Don't modify it - let the original request headers pass through
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant menu create proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// Restaurant update route
+app.put(
+  '/api/restaurants/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // For multipart/form-data, preserve the Content-Type header with boundary
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant update proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// Menu item update route
+app.put(
+  '/api/restaurants/menu-items/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // For multipart/form-data, preserve the Content-Type header with boundary
+    },
+    onError: (err: any, req, res) => {
+      console.error('Menu item update proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
     },
   })
 );
 
 app.put(
   '/api/restaurants/menu-items/:id/stock',
+  authenticateJWT,
+  express.json({ limit: '10mb' }),
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // Write body to proxy request if it exists
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant stock proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+app.put(
+  '/api/restaurants/menu-items/:id/availability',
   authenticateJWT,
   createProxyMiddleware({
     target: services.restaurantService,
@@ -318,7 +525,8 @@ app.use(
   })
 );
 
-app.use(
+// User addresses routes - GET and POST
+app.get(
   '/api/users/addresses',
   authenticateJWT,
   createProxyMiddleware({
@@ -342,13 +550,93 @@ app.use(
   })
 );
 
+app.post(
+  '/api/users/addresses',
+  authenticateJWT,
+  express.json({ limit: '10mb' }),
+  createProxyMiddleware({
+    target: services.userService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/users/addresses': '/users/addresses',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // Write body to proxy request if it exists
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('User addresses POST proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'User service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// User Service - Admin routes
+app.get(
+  '/api/users/admin/all',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.userService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/users': '/users',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('User admin all proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'User service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
 // Order Service - Customer routes (create order, get orders, get order by id)
 app.post(
   '/api/orders',
   authenticateJWT,
+  express.json({ limit: '10mb' }), // Parse JSON body for order creation
   createProxyMiddleware({
     target: services.orderService,
     changeOrigin: true,
+    timeout: 30000, // 30 seconds timeout for order creation (needs to call multiple services)
+    proxyTimeout: 30000,
     pathRewrite: {
       '^/api/orders': '/orders',
     },
@@ -362,6 +650,15 @@ app.post(
       }
       if (req.headers.authorization) {
         proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      
+      // Write JSON body if it exists (already parsed by express.json above)
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        (req as any).bodyParsed = true;
       }
     },
     onError: (err: any, req, res) => {
@@ -403,6 +700,103 @@ app.get(
 
 app.get(
   '/api/orders/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+// Order Service - Admin routes
+app.get(
+  '/api/orders/admin/dashboard/stats',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/admin/sales/statistics',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/admin/sales/restaurants',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/admin/all',
   authenticateJWT,
   createProxyMiddleware({
     target: services.orderService,
@@ -523,10 +917,266 @@ app.post(
 );
 
 // Payment Service - All routes require authentication
+// Payment Service - Simulate payment route (needs body parser)
+app.post(
+  '/api/payments/simulate',
+  authenticateJWT,
+  express.json({ limit: '10mb' }),
+  createProxyMiddleware({
+    target: services.paymentService,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/payments': '',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      
+      // Write JSON body if it exists
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+        (req as any).bodyParsed = true;
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Payment proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Payment service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// Payment Service - Other routes
 app.use('/api/payments', authenticateJWT, createAuthProxy(services.paymentService, 'payments'));
 
-// Driver Service - All routes require authentication
-app.use('/api/drivers', authenticateJWT, createAuthProxy(services.driverService, 'drivers'));
+// Driver Service - Admin routes
+app.get(
+  '/api/drivers/admin/all',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    timeout: 10000,
+    proxyTimeout: 10000,
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Driver admin all proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Driver service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/drivers/admin/salaries',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    timeout: 10000,
+    proxyTimeout: 10000,
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Driver salaries proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Driver service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+app.post(
+  '/api/drivers/admin/salaries',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.put(
+  '/api/drivers/admin/salaries/:id/status',
+  authenticateJWT,
+  express.json(),
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // Write JSON body for PUT request
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Driver salary status update proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Driver service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// Driver Service - Driver profile routes
+app.get(
+  '/api/drivers/profile',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.put(
+  '/api/drivers/profile',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+// Driver Service - Internal routes
+app.get(
+  '/api/drivers/internal/drivers/by-user/:userId',
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+  })
+);
+
+app.get(
+  '/api/drivers/internal/drivers/:id',
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+  })
+);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -556,10 +1206,10 @@ app.get('/', (req: Request, res: Response) => {
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error stack:', err.stack);
   if (!res.headersSent) {
-    res.status(500).json({
-      error: 'Internal server error',
-      message: err.message,
-    });
+  res.status(500).json({
+    error: 'Internal server error',
+    message: err.message,
+  });
   }
 });
 

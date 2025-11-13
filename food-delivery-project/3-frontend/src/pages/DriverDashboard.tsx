@@ -29,10 +29,16 @@ const statusColors: { [key: string]: string } = {
 
 export const DriverDashboard: React.FC = () => {
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
+  const [newOrderNotification, setNewOrderNotification] = useState<number>(0);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     fetchOrders();
     // Poll for new orders every 5 seconds
     const interval = setInterval(fetchOrders, 5000);
@@ -45,7 +51,19 @@ export const DriverDashboard: React.FC = () => {
       const myOrdersResponse = await driverAPI.getMyOrders();
 
       if (availableResponse.status === 'success') {
-        setAvailableOrders(availableResponse.data || []);
+        const newOrders = availableResponse.data || [];
+        // Check if there are new orders (notification)
+        if (newOrders.length > availableOrders.length) {
+          setNewOrderNotification(newOrders.length - availableOrders.length);
+          // Show browser notification if permission granted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('New Order Available!', {
+              body: `You have ${newOrders.length} new order(s) available`,
+              icon: '/favicon.ico',
+            });
+          }
+        }
+        setAvailableOrders(newOrders);
       }
 
       if (myOrdersResponse.status === 'success') {
@@ -111,12 +129,16 @@ export const DriverDashboard: React.FC = () => {
         {/* Available Orders */}
         <div>
           <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
               Available Orders
               {availableOrders.length > 0 && (
-                <span className="ml-2 bg-red-500 text-white rounded-full px-2 py-1 text-xs">
-                  {availableOrders.length} New
-                </span>
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="ml-2 bg-red-500 text-white rounded-full px-3 py-1 text-sm font-bold animate-pulse"
+                >
+                  🔔 {availableOrders.length} New Order{availableOrders.length > 1 ? 's' : ''}
+                </motion.span>
               )}
             </h2>
 

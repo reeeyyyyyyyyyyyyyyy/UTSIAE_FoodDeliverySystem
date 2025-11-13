@@ -1,40 +1,22 @@
 import { Router } from 'express';
 import { DriverController } from '../controllers/driver.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { authenticateToken, authorizeDriver } from '../middleware/auth.middleware';
+import { authorizeAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
-/**
- * @swagger
- * /status:
- *   put:
- *     summary: Update driver status
- *     tags: [Driver]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [AVAILABLE, BUSY, OFFLINE]
- *     responses:
- *       200:
- *         description: Driver status updated
- *       400:
- *         description: Bad request
- */
-router.put('/status', authenticateToken, DriverController.updateStatus);
+// Admin routes
+router.get('/admin/all', authenticateToken, authorizeAdmin, DriverController.getAllDrivers);
+router.get('/admin/salaries', authenticateToken, authorizeAdmin, DriverController.getDriverSalaries);
+router.post('/admin/salaries', authenticateToken, authorizeAdmin, DriverController.createDriverSalary);
+router.put('/admin/salaries/:id/status', authenticateToken, authorizeAdmin, DriverController.updateSalaryStatus);
+
+// Driver profile routes
+router.get('/profile', authenticateToken, authorizeDriver, DriverController.getDriverProfile);
+router.put('/profile', authenticateToken, authorizeDriver, DriverController.updateDriverProfile);
 
 // Internal routes
-router.get('/internal/drivers/:id', DriverController.getInternalDriver);
-router.post('/internal/drivers/assign', DriverController.assignDriver);
+router.get('/internal/drivers/by-user/:userId', DriverController.getDriverByUserId);
+router.get('/internal/drivers/:id', DriverController.getDriverById);
 
 export default router;
-

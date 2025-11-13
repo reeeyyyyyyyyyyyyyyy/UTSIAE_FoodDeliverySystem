@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/order.controller';
-import { authenticateToken, authorizeDriver } from '../middleware/auth.middleware';
+import { authenticateToken, authorizeDriver, authorizeAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -86,8 +86,16 @@ router.get('/driver/my-orders', authenticateToken, authorizeDriver, OrderControl
 router.post('/:id/accept', authenticateToken, authorizeDriver, OrderController.acceptOrder);
 router.post('/:id/complete', authenticateToken, authorizeDriver, OrderController.completeOrder);
 
+// Admin routes
+router.get('/admin/dashboard/stats', authenticateToken, authorizeAdmin, OrderController.getDashboardStats);
+router.get('/admin/sales/statistics', authenticateToken, authorizeAdmin, OrderController.getSalesStatistics);
+router.get('/admin/sales/restaurants', authenticateToken, authorizeAdmin, OrderController.getRestaurantSales);
+router.get('/admin/all', authenticateToken, authorizeAdmin, OrderController.getAllOrders);
+
 // Internal routes
 router.post('/internal/callback/payment', OrderController.paymentCallback);
+router.get('/internal/orders/user/:userId', authenticateToken, OrderController.getUserOrdersInternal);
+router.get('/internal/orders/driver/:driverId', authenticateToken, OrderController.getDriverOrdersInternal);
 
 export default router;
 

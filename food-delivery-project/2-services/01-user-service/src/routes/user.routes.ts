@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { UserController } from '../controllers/user.controller';
-import { authenticateToken } from '../middleware/auth.middleware';
+import { authenticateToken, authorizeAdmin } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -73,6 +73,10 @@ router.get('/addresses', authenticateToken, UserController.getAddresses);
  *         description: Unauthorized
  */
 router.post('/addresses', authenticateToken, UserController.createAddress);
+
+// Admin routes
+router.get('/admin/all', authenticateToken, authorizeAdmin, UserController.getAllUsers);
+router.get('/admin/users/:id/purchases', authenticateToken, authorizeAdmin, UserController.getUserPurchaseHistory);
 
 // Internal routes (no authentication required from gateway, but should be called from other services)
 router.get('/internal/users/:id', UserController.getInternalUser);

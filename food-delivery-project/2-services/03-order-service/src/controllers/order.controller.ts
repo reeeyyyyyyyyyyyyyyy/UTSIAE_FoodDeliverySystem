@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { OrderModel, OrderInput } from '../models/order.model';
 import { OrderService } from '../services/order.service';
+import pool from '../database/connection';
 import axios from 'axios';
 import dotenv from 'dotenv';
 
@@ -240,8 +241,11 @@ export class OrderController {
             const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
-            // Get customer details
-            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${order.user_id}`);
+            // Get customer details (SOA: Order Service calls User Service)
+            // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${order.user_id}`, {
+              timeout: 5000,
+            });
             const customerName = userResponse.data.data.name;
 
             // Get customer address
@@ -308,10 +312,10 @@ export class OrderController {
 
   static async acceptOrder(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const driverId = req.user?.id;
+      const userId = req.user?.id;
       const orderId = parseInt(req.params.id);
 
-      if (!driverId) {
+      if (!userId) {
         res.status(401).json({
           status: 'error',
           message: 'Unauthorized',
@@ -323,6 +327,28 @@ export class OrderController {
         res.status(400).json({
           status: 'error',
           message: 'Order ID is required',
+        });
+        return;
+      }
+
+      // Get driver ID from user ID
+      let driverId: number;
+      try {
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        if (driverResponse.data.status === 'success' && driverResponse.data.data) {
+          driverId = driverResponse.data.data.id;
+        } else {
+          res.status(404).json({
+            status: 'error',
+            message: 'Driver profile not found for this user',
+          });
+          return;
+        }
+      } catch (error: any) {
+        console.error('Failed to get driver by user ID:', error);
+        res.status(404).json({
+          status: 'error',
+          message: 'Driver profile not found for this user',
         });
         return;
       }
@@ -383,10 +409,10 @@ export class OrderController {
 
   static async completeOrder(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const driverId = req.user?.id;
+      const userId = req.user?.id;
       const orderId = parseInt(req.params.id);
 
-      if (!driverId) {
+      if (!userId) {
         res.status(401).json({
           status: 'error',
           message: 'Unauthorized',
@@ -398,6 +424,28 @@ export class OrderController {
         res.status(400).json({
           status: 'error',
           message: 'Order ID is required',
+        });
+        return;
+      }
+
+      // Get driver ID from user ID
+      let driverId: number;
+      try {
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        if (driverResponse.data.status === 'success' && driverResponse.data.data) {
+          driverId = driverResponse.data.data.id;
+        } else {
+          res.status(404).json({
+            status: 'error',
+            message: 'Driver profile not found for this user',
+          });
+          return;
+        }
+      } catch (error: any) {
+        console.error('Failed to get driver by user ID:', error);
+        res.status(404).json({
+          status: 'error',
+          message: 'Driver profile not found for this user',
         });
         return;
       }
@@ -452,12 +500,34 @@ export class OrderController {
 
   static async getDriverOrders(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const driverId = req.user?.id;
+      const userId = req.user?.id;
 
-      if (!driverId) {
+      if (!userId) {
         res.status(401).json({
           status: 'error',
           message: 'Unauthorized',
+        });
+        return;
+      }
+
+      // Get driver ID from user ID
+      let driverId: number;
+      try {
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        if (driverResponse.data.status === 'success' && driverResponse.data.data) {
+          driverId = driverResponse.data.data.id;
+        } else {
+          res.status(404).json({
+            status: 'error',
+            message: 'Driver profile not found for this user',
+          });
+          return;
+        }
+      } catch (error: any) {
+        console.error('Failed to get driver by user ID:', error);
+        res.status(404).json({
+          status: 'error',
+          message: 'Driver profile not found for this user',
         });
         return;
       }
@@ -474,7 +544,10 @@ export class OrderController {
             const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
-            const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${order.user_id}`);
+            // SOA: Order Service calls User Service
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${order.user_id}`, {
+              timeout: 5000,
+            });
             const customerName = userResponse.data.data.name;
 
             let customerAddress = 'Unknown';
@@ -531,6 +604,352 @@ export class OrderController {
       });
     } catch (error: any) {
       console.error('Get driver orders error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  // Admin endpoints
+  static async getSalesStatistics(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { start_date, end_date } = req.query;
+      const startDate = start_date ? new Date(start_date as string) : undefined;
+      const endDate = end_date ? new Date(end_date as string) : undefined;
+
+      // Get overall statistics
+      const totalOrders = await OrderModel.getTotalOrders();
+      const totalRevenue = await OrderModel.getTotalRevenue();
+      
+      // Get completed and pending orders
+      const [completedResult] = await pool.execute(
+        'SELECT COUNT(*) as count FROM orders WHERE status = ?',
+        ['DELIVERED']
+      ) as any[];
+      const completedOrders = completedResult[0]?.count || 0;
+
+      const [pendingResult] = await pool.execute(
+        'SELECT COUNT(*) as count FROM orders WHERE status IN (?, ?, ?)',
+        ['PENDING', 'PREPARING', 'ON_THE_WAY']
+      ) as any[];
+      const pendingOrders = pendingResult[0]?.count || 0;
+
+      // Calculate average order value
+      const averageOrderValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;
+
+      // Get daily statistics
+      const dailyStatistics = await OrderModel.getSalesStatistics(startDate, endDate);
+
+      res.json({
+        status: 'success',
+        data: {
+          total_orders: totalOrders,
+          total_revenue: totalRevenue,
+          completed_orders: completedOrders,
+          pending_orders: pendingOrders,
+          average_order_value: averageOrderValue,
+          daily_statistics: dailyStatistics,
+        },
+      });
+    } catch (error: any) {
+      console.error('Get sales statistics error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getRestaurantSales(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const restaurantId = req.query.restaurant_id ? parseInt(req.query.restaurant_id as string) : undefined;
+      
+      // First, get all restaurants from Restaurant Service
+      let allRestaurants: any[] = [];
+      try {
+        const restaurantsResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants`);
+        if (restaurantsResponse.data.status === 'success') {
+          allRestaurants = restaurantsResponse.data.data || [];
+        }
+      } catch (error) {
+        console.error('Failed to fetch restaurants:', error);
+      }
+
+      // Get sales data from orders
+      const sales = await OrderModel.getRestaurantSales(restaurantId);
+      
+      // Create a map of restaurant_id to sales data
+      const salesMap = new Map<number, any>();
+      sales.forEach((sale: any) => {
+        salesMap.set(sale.restaurant_id, sale);
+      });
+
+      // Combine all restaurants with sales data (0 if no sales)
+      const enrichedSales = allRestaurants.map((restaurant) => {
+        const saleData = salesMap.get(restaurant.id);
+        return {
+          restaurant_id: restaurant.id,
+          restaurant_name: restaurant.name,
+          total_orders: saleData ? (saleData.total_orders || 0) : 0,
+          total_revenue: saleData ? (parseFloat(saleData.total_revenue) || 0) : 0,
+          avg_order_value: saleData ? (parseFloat(saleData.avg_order_value) || 0) : 0,
+        };
+      });
+
+      // Sort by total_revenue descending
+      enrichedSales.sort((a, b) => b.total_revenue - a.total_revenue);
+
+      res.json({
+        status: 'success',
+        data: enrichedSales,
+      });
+    } catch (error: any) {
+      console.error('Get restaurant sales error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getAllOrders(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+      const orders = await OrderModel.getAllOrders(limit, offset);
+
+      // Enrich with restaurant, user, and driver details (SOA communication)
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            // SOA: Get restaurant details
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
+            const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            // SOA: Get customer details
+            const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${order.user_id}`, {
+              timeout: 5000,
+            });
+            const userName = userResponse.data.data.name;
+            const userEmail = userResponse.data.data.email;
+
+            // SOA: Get driver details if driver is assigned
+            let driverName = null;
+            let driverEmail = null;
+            if (order.driver_id) {
+              try {
+                // Get driver from Driver Service
+                const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/${order.driver_id}`, {
+                  timeout: 5000,
+                });
+                if (driverResponse.data.status === 'success' && driverResponse.data.data.user_id) {
+                  // Get driver user details from User Service
+                  const driverUserResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driverResponse.data.data.user_id}`, {
+                    timeout: 5000,
+                  });
+                  driverName = driverUserResponse.data.data.name;
+                  driverEmail = driverUserResponse.data.data.email;
+                }
+              } catch (error) {
+                console.error(`Failed to fetch driver details for driver_id ${order.driver_id}:`, error);
+              }
+            }
+
+            return {
+              order_id: order.id,
+              restaurant_name: restaurantName,
+              customer_name: userName,
+              customer_email: userEmail,
+              driver_id: order.driver_id,
+              driver_name: driverName,
+              driver_email: driverEmail,
+              status: order.status,
+              total_price: order.total_price,
+              estimated_delivery_time: order.estimated_delivery_time,
+              created_at: order.created_at,
+            };
+          } catch (error) {
+            console.error(`Failed to enrich order ${order.id}:`, error);
+            return {
+              order_id: order.id,
+              restaurant_name: 'Unknown',
+              customer_name: 'Unknown',
+              customer_email: 'Unknown',
+              driver_id: order.driver_id,
+              driver_name: null,
+              driver_email: null,
+              status: order.status,
+              total_price: order.total_price,
+              estimated_delivery_time: order.estimated_delivery_time,
+              created_at: order.created_at,
+            };
+          }
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: enrichedOrders,
+      });
+    } catch (error: any) {
+      console.error('Get all orders error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getDashboardStats(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const totalRevenue = await OrderModel.getTotalRevenue();
+      const totalOrders = await OrderModel.getTotalOrders();
+      const salesStatistics = await OrderModel.getSalesStatistics();
+      const restaurantSales = await OrderModel.getRestaurantSales();
+
+      res.json({
+        status: 'success',
+        data: {
+          total_revenue: totalRevenue,
+          total_orders: totalOrders,
+          sales_chart: salesStatistics,
+          restaurant_sales: restaurantSales,
+        },
+      });
+    } catch (error: any) {
+      console.error('Get dashboard stats error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getDriverOrdersInternal(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const driverId = parseInt(req.params.driverId);
+
+      if (!driverId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Driver ID is required',
+        });
+        return;
+      }
+
+      const orders = await OrderModel.findByDriverIdInternal(driverId);
+
+      // Enrich with restaurant details
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            const orderItems = await OrderModel.findItemsByOrderId(order.id);
+
+            return {
+              order_id: order.id,
+              restaurant_name: restaurantName,
+              status: order.status,
+              total_price: order.total_price,
+              items: orderItems.map((item) => ({
+                name: item.menu_item_name,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+              created_at: order.created_at,
+            };
+          } catch (error) {
+            return {
+              order_id: order.id,
+              restaurant_name: 'Unknown',
+              status: order.status,
+              total_price: order.total_price,
+              items: [],
+              created_at: order.created_at,
+            };
+          }
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: enrichedOrders,
+      });
+    } catch (error: any) {
+      console.error('Get driver orders internal error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async getUserOrdersInternal(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = parseInt(req.params.userId);
+
+      if (!userId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'User ID is required',
+        });
+        return;
+      }
+
+      const orders = await OrderModel.findByUserId(userId);
+
+      // Enrich with restaurant names
+      const enrichedOrders = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            const orderItems = await OrderModel.findItemsByOrderId(order.id);
+
+            return {
+              order_id: order.id,
+              restaurant_name: restaurantName,
+              status: order.status,
+              total_price: order.total_price,
+              items: orderItems.map((item) => ({
+                name: item.menu_item_name,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+              created_at: order.created_at,
+            };
+          } catch (error) {
+            return {
+              order_id: order.id,
+              restaurant_name: 'Unknown',
+              status: order.status,
+              total_price: order.total_price,
+              items: [],
+              created_at: order.created_at,
+            };
+          }
+        })
+      );
+
+      res.json({
+        status: 'success',
+        data: enrichedOrders,
+      });
+    } catch (error: any) {
+      console.error('Get user orders internal error:', error);
       res.status(500).json({
         status: 'error',
         message: 'Internal server error',

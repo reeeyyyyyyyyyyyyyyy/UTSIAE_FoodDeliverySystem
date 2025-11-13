@@ -32,8 +32,18 @@ export interface MenuItemCheck {
 
 export class RestaurantModel {
   static async findAll(): Promise<Restaurant[]> {
-    const [rows] = await pool.execute('SELECT DISTINCT * FROM restaurants ORDER BY name ASC');
-    return rows as Restaurant[];
+    try {
+      const [rows] = await pool.execute('SELECT * FROM restaurants ORDER BY name ASC');
+      const restaurants = rows as Restaurant[];
+      // Remove duplicates by id (in case of any duplicates)
+      const uniqueRestaurants = restaurants.filter((r, index, self) => 
+        index === self.findIndex((rest) => rest.id === r.id)
+      );
+      return uniqueRestaurants;
+    } catch (error: any) {
+      console.error('Error in RestaurantModel.findAll:', error);
+      throw error;
+    }
   }
 
   static async findById(id: number): Promise<Restaurant | null> {
@@ -53,17 +63,70 @@ export class RestaurantModel {
       [restaurantData.name, restaurantData.cuisine_type, restaurantData.address, restaurantData.image_url || null, restaurantData.is_open !== undefined ? restaurantData.is_open : true]
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId) as Promise<Restaurant>;
+    const restaurant = await this.findById(insertId);
+    if (!restaurant) {
+      throw new Error('Failed to create restaurant');
+    }
+    return restaurant;
+  }
+
+  static async update(id: number, restaurantData: Partial<{ name: string; cuisine_type: string; address: string; image_url?: string; is_open?: boolean }>): Promise<Restaurant | null> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (restaurantData.name) {
+      updates.push('name = ?');
+      values.push(restaurantData.name);
+    }
+    if (restaurantData.cuisine_type) {
+      updates.push('cuisine_type = ?');
+      values.push(restaurantData.cuisine_type);
+    }
+    if (restaurantData.address) {
+      updates.push('address = ?');
+      values.push(restaurantData.address);
+    }
+    if (restaurantData.image_url !== undefined) {
+      updates.push('image_url = ?');
+      values.push(restaurantData.image_url);
+    }
+    if (restaurantData.is_open !== undefined) {
+      updates.push('is_open = ?');
+      values.push(restaurantData.is_open);
+    }
+
+    if (updates.length === 0) {
+      return this.findById(id);
+    }
+
+    values.push(id);
+    await pool.execute(`UPDATE restaurants SET ${updates.join(', ')} WHERE id = ?`, values);
+    return this.findById(id);
+  }
+
+  static async delete(id: number): Promise<boolean> {
+    const [result] = await pool.execute('DELETE FROM restaurants WHERE id = ?', [id]);
+    return (result as any).affectedRows > 0;
   }
 }
 
 export class MenuItemModel {
   static async findByRestaurantId(restaurantId: number): Promise<MenuItem[]> {
-    const [rows] = await pool.execute(
-      'SELECT DISTINCT * FROM menu_items WHERE restaurant_id = ? AND is_available = TRUE ORDER BY name ASC',
-      [restaurantId]
-    );
-    return rows as MenuItem[];
+    try {
+      const [rows] = await pool.execute(
+        'SELECT * FROM menu_items WHERE restaurant_id = ? ORDER BY category ASC, name ASC',
+        [restaurantId]
+      );
+      const menuItems = rows as MenuItem[];
+      // Remove duplicates by id (in case of any duplicates)
+      const uniqueMenuItems = menuItems.filter((item, index, self) => 
+        index === self.findIndex((m) => m.id === item.id)
+      );
+      return uniqueMenuItems;
+    } catch (error: any) {
+      console.error('Error in MenuItemModel.findByRestaurantId:', error);
+      throw error;
+    }
   }
 
   static async findById(id: number): Promise<MenuItem | null> {
@@ -131,7 +194,57 @@ export class MenuItemModel {
       ]
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId) as Promise<MenuItem>;
+    const menuItem = await this.findById(insertId);
+    if (!menuItem) {
+      throw new Error('Failed to create menu item');
+    }
+    return menuItem;
+  }
+
+  static async update(id: number, menuItemData: Partial<{ name: string; description?: string; price: number; stock: number; category?: string; image_url?: string; is_available?: boolean }>): Promise<MenuItem | null> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (menuItemData.name) {
+      updates.push('name = ?');
+      values.push(menuItemData.name);
+    }
+    if (menuItemData.description !== undefined) {
+      updates.push('description = ?');
+      values.push(menuItemData.description);
+    }
+    if (menuItemData.price !== undefined) {
+      updates.push('price = ?');
+      values.push(menuItemData.price);
+    }
+    if (menuItemData.stock !== undefined) {
+      updates.push('stock = ?');
+      values.push(menuItemData.stock);
+    }
+    if (menuItemData.category) {
+      updates.push('category = ?');
+      values.push(menuItemData.category);
+    }
+    if (menuItemData.image_url !== undefined) {
+      updates.push('image_url = ?');
+      values.push(menuItemData.image_url);
+    }
+    if (menuItemData.is_available !== undefined) {
+      updates.push('is_available = ?');
+      values.push(menuItemData.is_available);
+    }
+
+    if (updates.length === 0) {
+      return this.findById(id);
+    }
+
+    values.push(id);
+    await pool.execute(`UPDATE menu_items SET ${updates.join(', ')} WHERE id = ?`, values);
+    return this.findById(id);
+  }
+
+  static async delete(id: number): Promise<boolean> {
+    const [result] = await pool.execute('DELETE FROM menu_items WHERE id = ?', [id]);
+    return (result as any).affectedRows > 0;
   }
 }
-

@@ -78,3 +78,23 @@ export const authorizeDriver = (req: Request, res: Response, next: NextFunction)
   next();
 };
 
+export const authorizeAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized',
+    });
+    return;
+  }
+
+  if (req.user.role !== 'admin') {
+    res.status(403).json({
+      status: 'error',
+      message: 'Access denied. Admin role required.',
+    });
+    return;
+  }
+
+  next();
+};
+

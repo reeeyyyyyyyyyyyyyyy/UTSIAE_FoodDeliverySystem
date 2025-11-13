@@ -16,9 +16,24 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files
+import path from 'path';
+const uploadsPath = path.join(process.cwd(), 'uploads');
+app.use('/uploads', express.static(uploadsPath));
+
 // Health Check
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', service: 'Restaurant Service' });
+});
+
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'success',
+    message: 'Restaurant Service is running',
+    service: 'Restaurant Service',
+    version: '1.0.0'
+  });
 });
 
 // Swagger Docs

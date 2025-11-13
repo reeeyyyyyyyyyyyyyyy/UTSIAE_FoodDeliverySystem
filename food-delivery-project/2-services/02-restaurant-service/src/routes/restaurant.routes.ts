@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { RestaurantController } from '../controllers/restaurant.controller';
 import { authenticateToken, authorizeAdmin } from '../middleware/auth.middleware';
+import { upload } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -44,9 +45,12 @@ router.get('/', RestaurantController.getRestaurants);
 router.get('/:id/menu', RestaurantController.getRestaurantMenu);
 
 // Admin routes (require authentication and admin role)
-router.post('/', authenticateToken, authorizeAdmin, RestaurantController.createRestaurant);
-router.post('/:id/menu', authenticateToken, authorizeAdmin, RestaurantController.createMenuItem);
+router.post('/', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.createRestaurant);
+router.put('/:id', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.updateRestaurant);
+router.post('/:id/menu', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.createMenuItem);
+router.put('/menu-items/:id', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.updateMenuItem);
 router.put('/menu-items/:id/stock', authenticateToken, authorizeAdmin, RestaurantController.restockMenuItem);
+router.put('/menu-items/:id/availability', authenticateToken, authorizeAdmin, RestaurantController.setMenuItemAvailability);
 
 // Internal routes
 router.post('/internal/menu-items/check', RestaurantController.checkMenuItems);

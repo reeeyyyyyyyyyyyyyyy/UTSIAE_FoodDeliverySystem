@@ -21,6 +21,16 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', service: 'Driver Service' });
 });
 
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'success',
+    message: 'Driver Service is running',
+    service: 'Driver Service',
+    version: '1.0.0'
+  });
+});
+
 // Swagger Docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec)); // INI SEKARANG AMAN
 

@@ -101,6 +101,11 @@ export const userAPI = {
     const response = await api.post('/users/addresses', data);
     return response.data;
   },
+  // Admin endpoints
+  getAllUsers: async () => {
+    const response = await api.get('/users/admin/all');
+    return response.data;
+  },
 };
 
 // Restaurant API
@@ -130,6 +135,19 @@ export const orderAPI = {
     const response = await api.get(`/orders/${orderId}`);
     return response.data;
   },
+  // Admin endpoints
+  getSalesStatistics: async () => {
+    const response = await api.get('/orders/admin/sales/statistics');
+    return response.data;
+  },
+  getRestaurantSales: async () => {
+    const response = await api.get('/orders/admin/sales/restaurants');
+    return response.data;
+  },
+  getAllOrders: async () => {
+    const response = await api.get('/orders/admin/all');
+    return response.data;
+  },
 };
 
 // Payment API
@@ -142,12 +160,36 @@ export const paymentAPI = {
 
 // Admin API
 export const adminAPI = {
-  createRestaurant: async (data: { name: string; cuisine_type: string; address: string; image_url?: string; is_open?: boolean }) => {
-    const response = await api.post('/restaurants', data);
+  createRestaurant: async (formData: FormData) => {
+    const response = await api.post('/restaurants', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
-  createMenuItem: async (restaurantId: number, data: { name: string; description?: string; price: number; stock: number; category?: string; image_url?: string }) => {
-    const response = await api.post(`/restaurants/${restaurantId}/menu`, data);
+  updateRestaurant: async (restaurantId: number, formData: FormData) => {
+    const response = await api.put(`/restaurants/${restaurantId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  createMenuItem: async (restaurantId: number, formData: FormData) => {
+    const response = await api.post(`/restaurants/${restaurantId}/menu`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  updateMenuItem: async (menuItemId: number, formData: FormData) => {
+    const response = await api.put(`/restaurants/menu-items/${menuItemId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
   restockMenuItem: async (menuItemId: number, quantity: number) => {
@@ -172,6 +214,23 @@ export const driverAPI = {
   },
   completeOrder: async (orderId: number) => {
     const response = await api.post(`/orders/${orderId}/complete`);
+    return response.data;
+  },
+  // Admin endpoints for driver management
+  getAllDrivers: async () => {
+    const response = await api.get('/drivers/admin/all');
+    return response.data;
+  },
+  getDriverSalaries: async () => {
+    const response = await api.get('/drivers/admin/salaries');
+    return response.data;
+  },
+  createDriverSalary: async (data: { driver_id: number; period: string }) => {
+    const response = await api.post('/drivers/admin/salaries', data);
+    return response.data;
+  },
+  updateSalaryStatus: async (salaryId: number, status: string) => {
+    const response = await api.put(`/drivers/admin/salaries/${salaryId}/status`, { status });
     return response.data;
   },
 };

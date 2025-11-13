@@ -94,6 +94,17 @@ export class UserModel {
     const [result] = await pool.execute('DELETE FROM users WHERE id = ?', [id]);
     return (result as any).affectedRows > 0;
   }
+
+  static async findAll(limit: number = 100, offset: number = 0): Promise<User[]> {
+    const [rows] = await pool.execute('SELECT id, name, email, phone, role, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+    return rows as User[];
+  }
+
+  static async getTotalUsers(): Promise<number> {
+    const [rows] = await pool.execute('SELECT COUNT(*) as total FROM users');
+    const result = rows as any[];
+    return result[0]?.total || 0;
+  }
 }
 
 export class AddressModel {
