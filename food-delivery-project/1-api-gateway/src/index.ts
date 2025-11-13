@@ -698,8 +698,33 @@ app.get(
   })
 );
 
+// Order Service - Driver routes (MUST BE BEFORE /api/orders/:id to avoid route conflict)
 app.get(
-  '/api/orders/:id',
+  '/api/orders/available',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.orderService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/orders': '/orders',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+  })
+);
+
+app.get(
+  '/api/orders/driver/my-orders',
   authenticateJWT,
   createProxyMiddleware({
     target: services.orderService,
@@ -819,33 +844,9 @@ app.get(
   })
 );
 
-// Order Service - Driver routes (available orders, accept, complete)
+// Order Service - Get order by ID (MUST BE AFTER specific routes)
 app.get(
-  '/api/orders/available',
-  authenticateJWT,
-  createProxyMiddleware({
-    target: services.orderService,
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api/orders': '/orders',
-    },
-    onProxyReq: (proxyReq, req) => {
-      if (req.user) {
-        proxyReq.setHeader('X-User-Id', req.user.id.toString());
-        proxyReq.setHeader('X-User-Email', req.user.email);
-        if (req.user.role) {
-          proxyReq.setHeader('X-User-Role', req.user.role);
-        }
-      }
-      if (req.headers.authorization) {
-        proxyReq.setHeader('Authorization', req.headers.authorization);
-      }
-    },
-  })
-);
-
-app.get(
-  '/api/orders/driver/my-orders',
+  '/api/orders/:id',
   authenticateJWT,
   createProxyMiddleware({
     target: services.orderService,
@@ -928,7 +929,7 @@ app.post(
     timeout: 30000,
     proxyTimeout: 30000,
     pathRewrite: {
-      '^/api/payments': '',
+      '^/api/payments': '/payments', // Keep /payments because routes are mounted at /payments
     },
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
@@ -965,7 +966,42 @@ app.post(
 );
 
 // Payment Service - Other routes
-app.use('/api/payments', authenticateJWT, createAuthProxy(services.paymentService, 'payments'));
+// Note: Payment Service routes are mounted at /payments, so we need custom pathRewrite
+app.use(
+  '/api/payments',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.paymentService,
+    changeOrigin: true,
+    timeout: 30000,
+    proxyTimeout: 30000,
+    pathRewrite: {
+      '^/api/payments': '/payments', // Keep /payments because routes are mounted at /payments
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Payment proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Payment service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
 
 // Driver Service - Admin routes
 app.get(
@@ -1095,6 +1131,43 @@ app.put(
     },
     onError: (err: any, req, res) => {
       console.error('Driver salary status update proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Driver service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// Driver Service - Mark driver earnings as paid (auto-create salary)
+app.post(
+  '/api/drivers/admin/salaries/mark-as-paid/:driverId',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.driverService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/drivers': '/drivers',
+    },
+    timeout: 30000,
+    proxyTimeout: 30000,
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Driver mark as paid proxy error:', err);
       if (!(res as Response).headersSent) {
         (res as Response).status(502).json({
           status: 'error',

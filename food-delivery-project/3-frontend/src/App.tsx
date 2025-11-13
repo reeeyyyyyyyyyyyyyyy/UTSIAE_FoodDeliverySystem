@@ -2,8 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/layout/Navbar';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
+import { Welcome } from './pages/Welcome';
 import { Home } from './pages/Home';
 import { RestaurantDetail } from './pages/RestaurantDetail';
 import { OrderStatus } from './pages/OrderStatus';
@@ -48,31 +47,24 @@ const CustomerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  return !isAuthenticated ? <>{children}</> : <Navigate to="/" />;
+  // Public routes are accessible to everyone, including authenticated users
+  // RoleRedirect will handle redirecting authenticated users from root path
+  return <>{children}</>;
 };
 
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        }
-      />
-      <Route
         path="/"
+        element={
+          <PublicRoute>
+            <Welcome />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/home"
         element={
           <ProtectedRoute>
             <Navbar />

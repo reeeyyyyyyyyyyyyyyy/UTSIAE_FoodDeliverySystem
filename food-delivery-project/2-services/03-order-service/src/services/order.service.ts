@@ -64,15 +64,34 @@ export class OrderService {
 
   static async createPayment(orderId: number, totalPrice: number, userId: number): Promise<number> {
     try {
-      const response = await axios.post(`${PAYMENT_SERVICE_URL}/internal/payments`, {
+      // SOA: Order Service calls Payment Service internal endpoint
+      // Path: /payments/internal/payments (because paymentRoutes is mounted at /payments)
+      const response = await axios.post(`${PAYMENT_SERVICE_URL}/payments/internal/payments`, {
         order_id: orderId,
         user_id: userId,
         amount: totalPrice,
+      }, {
+        timeout: 5000,
       });
       return response.data.data.payment_id;
     } catch (error: any) {
       throw new Error(`Failed to create payment: ${error.message}`);
     }
+  }
+
+  static compareOrderItems(
+    newItems: Array<{ menu_item_id: number; quantity: number }>,
+    existingItems: Array<{ menu_item_id: number; quantity: number }>
+  ): boolean {
+    if (newItems.length !== existingItems.length) {
+      return false;
+    }
+    const sortedNew = [...newItems].sort((a, b) => a.menu_item_id - b.menu_item_id);
+    const sortedExisting = [...existingItems].sort((a, b) => a.menu_item_id - b.menu_item_id);
+    return sortedNew.every((item, index) => {
+      const existing = sortedExisting[index];
+      return item.menu_item_id === existing.menu_item_id && item.quantity === existing.quantity;
+    });
   }
 
   static async decreaseStock(items: Array<{ menu_item_id: number; quantity: number }>): Promise<void> {
@@ -91,11 +110,29 @@ export class OrderService {
     // Step 1: Validate user
     await this.validateUser(userId);
 
+    // Step 1.5: Check for duplicate order (same user, restaurant, items within last 5 seconds)
+    // This prevents duplicate orders from multiple clicks
+    const recentOrders = await OrderModel.findRecentOrdersByUser(userId, orderData.restaurant_id, 5);
+    if (recentOrders.length > 0) {
+      // Check if items match
+      const recentOrder = recentOrders[0];
+      const recentItems = await OrderModel.findItemsByOrderId(recentOrder.id);
+      // Convert recentItems to format { menu_item_id, quantity } for comparison
+      const recentItemsFormatted = recentItems.map(item => ({
+        menu_item_id: item.menu_item_id,
+        quantity: item.quantity,
+      }));
+      const itemsMatch = this.compareOrderItems(orderData.items, recentItemsFormatted);
+      if (itemsMatch && recentOrder.status === 'PENDING_PAYMENT') {
+        throw new Error('Duplicate order detected. Please wait a moment and check your orders.');
+      }
+    }
+
     // Step 2: Validate restaurant and menu, check stock
     const { restaurant, menuItems } = await this.validateRestaurantAndMenu(orderData.restaurant_id, orderData.items);
 
-    // Step 3: Calculate total price
-    let totalPrice = 0;
+    // Step 3: Calculate total price (subtotal + tax + delivery fee)
+    let subtotal = 0;
     const orderItems: Array<{ menu_item_id: number; menu_item_name: string; quantity: number; price: number }> = [];
 
     for (const item of orderData.items) {
@@ -104,7 +141,7 @@ export class OrderService {
         throw new Error(`Menu item ${item.menu_item_id} not found`);
       }
       const itemTotal = menuItem.price * item.quantity;
-      totalPrice += itemTotal;
+      subtotal += itemTotal;
       orderItems.push({
         menu_item_id: item.menu_item_id,
         menu_item_name: menuItem.name,
@@ -113,6 +150,11 @@ export class OrderService {
       });
     }
 
+    // Calculate tax (10%) and delivery fee (fixed 10000)
+    const tax = subtotal * 0.1;
+    const deliveryFee = 10000;
+    const totalPrice = subtotal + tax + deliveryFee;
+
     // Step 4: Create order in database
     const order = await OrderModel.create(
       {
@@ -120,7 +162,7 @@ export class OrderService {
         restaurant_id: orderData.restaurant_id,
         address_id: orderData.address_id,
         status: 'PENDING_PAYMENT',
-        total_price: totalPrice,
+        total_price: totalPrice, // Total includes subtotal + tax + delivery fee
       },
       orderItems
     );

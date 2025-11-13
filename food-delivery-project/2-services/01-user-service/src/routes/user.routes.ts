@@ -80,6 +80,7 @@ router.get('/admin/users/:id/purchases', authenticateToken, authorizeAdmin, User
 
 // Internal routes (no authentication required from gateway, but should be called from other services)
 router.get('/internal/users/:id', UserController.getInternalUser);
+router.get('/internal/addresses/:id', UserController.getInternalAddress);
 
 export default router;
 

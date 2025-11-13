@@ -169,6 +169,50 @@ export class UserController {
     }
   }
 
+  // Internal endpoint to get address by ID (for SOA communication)
+  static async getInternalAddress(req: Request, res: Response): Promise<void> {
+    try {
+      const addressId = parseInt(req.params.id);
+
+      if (!addressId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Address ID is required',
+        });
+        return;
+      }
+
+      const address = await AddressModel.findById(addressId);
+      if (!address) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Address not found',
+        });
+        return;
+      }
+
+      res.json({
+        status: 'success',
+        data: {
+          id: address.id,
+          user_id: address.user_id,
+          label: address.label,
+          full_address: address.full_address,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          is_default: address.is_default,
+        },
+      });
+    } catch (error: any) {
+      console.error('Get internal address error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
   // Admin endpoints
   static async getAllUsers(req: AuthRequest, res: Response): Promise<void> {
     try {

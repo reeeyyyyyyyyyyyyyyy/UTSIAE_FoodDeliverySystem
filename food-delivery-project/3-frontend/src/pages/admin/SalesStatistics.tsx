@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { orderAPI } from '../../services/api';
+import { formatRupiah } from '../../utils/format';
 
 interface Statistics {
   total_orders: number;
@@ -88,7 +89,7 @@ export const SalesStatistics: React.FC = () => {
                 className="bg-white p-6 rounded-lg shadow-md"
               >
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Total Revenue</h3>
-                <p className="text-3xl font-bold text-green-600">Rp {(statistics.total_revenue || 0).toLocaleString()}</p>
+                <p className="text-3xl font-bold text-green-600">{formatRupiah(statistics.total_revenue || 0)}</p>
               </motion.div>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -112,7 +113,7 @@ export const SalesStatistics: React.FC = () => {
                 className="bg-white p-6 rounded-lg shadow-md"
               >
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Avg Order Value</h3>
-                <p className="text-3xl font-bold text-blue-600">Rp {(statistics.average_order_value || 0).toLocaleString()}</p>
+                <p className="text-3xl font-bold text-blue-600">{formatRupiah(statistics.average_order_value || 0)}</p>
               </motion.div>
             </div>
           )}
@@ -145,7 +146,7 @@ export const SalesStatistics: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{stat.total_orders || 0}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        Rp {(stat.total_revenue || 0).toLocaleString()}
+                        {formatRupiah(stat.total_revenue || 0)}
                       </td>
                     </tr>
                   ))}

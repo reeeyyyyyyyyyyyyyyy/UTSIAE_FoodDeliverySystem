@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
-    role VARCHAR(50) DEFAULT 'user',
+    role ENUM('CUSTOMER', 'ADMIN', 'DRIVER') DEFAULT 'CUSTOMER',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email)
@@ -36,11 +36,12 @@ CREATE TABLE IF NOT EXISTS addresses (
 -- Password: Password123! (hashed with bcrypt)
 -- To generate new hash, run: node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('Password123!', 10).then(hash => console.log(hash));"
 INSERT INTO users (name, email, password, phone, role) VALUES
-('Admin User', 'admin@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'admin'),
-('Driver One', 'driver1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567891', 'driver'),
-('Driver Two', 'driver2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567892', 'driver'),
-('Customer One', 'customer1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567893', 'customer'),
-('Customer Two', 'customer2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567894', 'customer'),
-('Customer Three', 'customer3@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567895', 'customer')
+('Admin User', 'admin@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'ADMIN'),
+('Driver Test', 'driver@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567890', 'DRIVER'),
+('Driver One', 'driver1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567891', 'DRIVER'),
+('Driver Two', 'driver2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567892', 'DRIVER'),
+('Customer One', 'customer1@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567893', 'CUSTOMER'),
+('Customer Two', 'customer2@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567894', 'CUSTOMER'),
+('Customer Three', 'customer3@example.com', '$2a$10$lV/JwJm0pcWa7R.WP3PVqeCrTfqMb6fTm0TVEbqLunxUU.fUvxX1m', '081234567895', 'CUSTOMER')
 ON DUPLICATE KEY UPDATE email=email;
 

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { orderAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
+import { formatRupiah } from '../utils/format';
 
 interface OrderItem {
   menu_item_name: string;
@@ -80,10 +81,12 @@ export const Invoice: React.FC = () => {
     );
   }
 
+  // Calculate from order items (backend already includes tax and delivery fee in total_price)
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.1; // 10% tax
   const deliveryFee = 10000; // Fixed delivery fee
-  const total = subtotal + tax + deliveryFee;
+  // Use backend total_price to ensure consistency (it already includes tax + delivery fee)
+  const total = order.total_price || (subtotal + tax + deliveryFee);
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -176,11 +179,11 @@ export const Invoice: React.FC = () => {
               <tbody>
                 {order.items.map((item, index) => (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="py-3 text-gray-800">{item.menu_item_name}</td>
+                    <td className="py-3 text-gray-800">{item.menu_item_name || item.name}</td>
                     <td className="text-center py-3 text-gray-600">{item.quantity}</td>
-                    <td className="text-right py-3 text-gray-600">Rp {item.price.toLocaleString()}</td>
+                    <td className="text-right py-3 text-gray-600">{formatRupiah(item.price)}</td>
                     <td className="text-right py-3 font-semibold text-gray-800">
-                      Rp {(item.price * item.quantity).toLocaleString()}
+                      {formatRupiah(item.price * item.quantity)}
                     </td>
                   </tr>
                 ))}
@@ -193,20 +196,20 @@ export const Invoice: React.FC = () => {
             <div className="space-y-2 text-right">
               <div className="flex justify-end gap-4">
                 <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium text-gray-800 w-32">Rp {subtotal.toLocaleString()}</span>
+                <span className="font-medium text-gray-800 w-32">{formatRupiah(subtotal)}</span>
               </div>
               <div className="flex justify-end gap-4">
                 <span className="text-gray-600">Tax (10%):</span>
-                <span className="font-medium text-gray-800 w-32">Rp {tax.toLocaleString()}</span>
+                <span className="font-medium text-gray-800 w-32">{formatRupiah(tax)}</span>
               </div>
               <div className="flex justify-end gap-4">
                 <span className="text-gray-600">Delivery Fee:</span>
-                <span className="font-medium text-gray-800 w-32">Rp {deliveryFee.toLocaleString()}</span>
+                <span className="font-medium text-gray-800 w-32">{formatRupiah(deliveryFee)}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 mt-2">
                 <div className="flex justify-end gap-4">
                   <span className="text-lg font-bold text-gray-800">Total:</span>
-                  <span className="text-lg font-bold text-primary-600 w-32">Rp {total.toLocaleString()}</span>
+                  <span className="text-lg font-bold text-primary-600 w-32">{formatRupiah(total)}</span>
                 </div>
               </div>
             </div>

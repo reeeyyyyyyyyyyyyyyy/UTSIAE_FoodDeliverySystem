@@ -35,8 +35,7 @@ CREATE TABLE IF NOT EXISTS driver_salaries (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (driver_id) REFERENCES drivers(id) ON DELETE CASCADE,
     INDEX idx_driver_id (driver_id),
-    INDEX idx_month_year (month, year),
-    UNIQUE KEY unique_driver_month_year (driver_id, month, year)
+    INDEX idx_month_year (month, year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Note: Driver data is inserted via migrate.ts script

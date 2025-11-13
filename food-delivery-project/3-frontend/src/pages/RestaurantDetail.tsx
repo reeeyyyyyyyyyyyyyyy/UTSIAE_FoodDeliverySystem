@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { restaurantAPI, orderAPI, userAPI, paymentAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
+import { formatRupiah } from '../utils/format';
+import { showSuccess, showError } from '../utils/swal';
 
 interface MenuItem {
   id: number;
@@ -143,6 +145,11 @@ export const RestaurantDetail: React.FC = () => {
       return;
     }
 
+    // Prevent duplicate order creation
+    if (isOrdering) {
+      return;
+    }
+
     setIsOrdering(true);
     setError('');
     setSuccess('');
@@ -160,6 +167,9 @@ export const RestaurantDetail: React.FC = () => {
       if (response.status === 'success') {
         const orderId = response.data.order_id;
         const paymentId = response.data.payment_id;
+
+        // Clear cart after successful order creation
+        setCart([]);
 
         // Redirect to payment page instead of simulating payment immediately
         navigate(`/payment/${orderId}?payment_id=${paymentId}`);
@@ -277,7 +287,7 @@ export const RestaurantDetail: React.FC = () => {
                             )}
                           </div>
                           <span className="text-primary-600 font-bold text-lg">
-                            Rp {item.price.toLocaleString()}
+                            {formatRupiah(item.price)}
                           </span>
                         </div>
                         <p className="text-gray-600 text-sm mb-3">{item.description}</p>
@@ -355,7 +365,7 @@ export const RestaurantDetail: React.FC = () => {
                           <div className="flex-1">
                             <p className="text-sm font-medium text-gray-800">{item.name}</p>
                             <p className="text-xs text-gray-500">
-                              Rp {item.price.toLocaleString()} × {item.quantity}
+                              {formatRupiah(item.price)} × {item.quantity}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -387,7 +397,7 @@ export const RestaurantDetail: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-gray-700 font-medium">Subtotal:</span>
                         <span className="text-gray-800 font-semibold">
-                          Rp {totalPrice.toLocaleString()}
+                          {formatRupiah(totalPrice)}
                         </span>
                       </div>
 
@@ -423,7 +433,7 @@ export const RestaurantDetail: React.FC = () => {
                                 Processing...
                               </span>
                             ) : (
-                              `Place Order - Rp ${totalPrice.toLocaleString()}`
+                              `Place Order - ${formatRupiah(totalPrice)}`
                             )}
                           </Button>
                         </>

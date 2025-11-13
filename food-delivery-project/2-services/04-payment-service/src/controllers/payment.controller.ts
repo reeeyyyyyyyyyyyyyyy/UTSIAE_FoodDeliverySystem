@@ -59,11 +59,14 @@ export class PaymentController {
       // Update payment status
       await PaymentModel.updateStatus(payment_id, 'SUCCESS');
 
-      // Call order service webhook to update order status
+      // SOA: Payment Service calls Order Service internal callback endpoint
+      // Path: /orders/internal/callback/payment (because orderRoutes is mounted at /orders)
       try {
-        await axios.post(`${ORDER_SERVICE_URL}/internal/callback/payment`, {
+        await axios.post(`${ORDER_SERVICE_URL}/orders/internal/callback/payment`, {
           order_id,
           payment_status: 'SUCCESS',
+        }, {
+          timeout: 5000,
         });
       } catch (error: any) {
         console.error('Failed to notify order service:', error.message);

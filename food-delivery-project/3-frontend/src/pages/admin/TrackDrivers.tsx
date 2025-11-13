@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { driverAPI } from '../../services/api';
+import { formatRupiah } from '../../utils/format';
 import { Button } from '../../components/ui/Button';
 
 interface ActiveOrder {
@@ -34,6 +35,9 @@ export const TrackDrivers: React.FC = () => {
 
   useEffect(() => {
     fetchDrivers();
+    // Auto-refresh every 5 seconds to get real-time updates
+    const interval = setInterval(fetchDrivers, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchDrivers = async () => {
@@ -112,7 +116,7 @@ export const TrackDrivers: React.FC = () => {
                         <p className="text-gray-600">Restaurant: {order.restaurant_name}</p>
                         <p className="text-gray-600">Customer: {order.customer_name}</p>
                         <p className="text-gray-600">Status: <span className="font-semibold">{order.status}</span></p>
-                        <p className="text-gray-600">Total: Rp {order.total_price?.toLocaleString() || '0'}</p>
+                        <p className="text-gray-600">Total: {formatRupiah(order.total_price || 0)}</p>
                       </div>
                     ))}
                   </div>
@@ -120,7 +124,7 @@ export const TrackDrivers: React.FC = () => {
                 <p>
                   <span className="font-medium text-gray-600">Total Earnings:</span>{' '}
                   <span className="font-semibold text-green-600">
-                    Rp {driver.total_earnings?.toLocaleString() || '0'}
+                    {formatRupiah(driver.total_earnings || 0)}
                   </span>
                 </p>
                 <p>

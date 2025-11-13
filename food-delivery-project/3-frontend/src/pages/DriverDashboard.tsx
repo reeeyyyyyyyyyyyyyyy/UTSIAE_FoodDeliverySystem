@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { driverAPI } from '../services/api';
 import { Button } from '../components/ui/Button';
+import { formatRupiah } from '../utils/format';
+import { showSuccess, showError, showConfirm } from '../utils/swal';
 
 interface Order {
   order_id: number;
@@ -19,12 +21,12 @@ interface Order {
 }
 
 const statusColors: { [key: string]: string } = {
-  PENDING_PAYMENT: 'bg-yellow-100 text-yellow-800',
-  PAID: 'bg-blue-100 text-blue-800',
-  PREPARING: 'bg-orange-100 text-orange-800',
-  ON_THE_WAY: 'bg-purple-100 text-purple-800',
-  DELIVERED: 'bg-green-100 text-green-800',
-  PAYMENT_FAILED: 'bg-red-100 text-red-800',
+  PENDING_PAYMENT: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  PAID: 'bg-blue-100 text-blue-800 border-blue-300',
+  PREPARING: 'bg-orange-100 text-orange-800 border-orange-300',
+  ON_THE_WAY: 'bg-purple-100 text-purple-800 border-purple-300',
+  DELIVERED: 'bg-green-100 text-green-800 border-green-300',
+  PAYMENT_FAILED: 'bg-red-100 text-red-800 border-red-300',
 };
 
 export const DriverDashboard: React.FC = () => {
@@ -34,13 +36,11 @@ export const DriverDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
 
     fetchOrders();
-    // Poll for new orders every 5 seconds
     const interval = setInterval(fetchOrders, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -52,13 +52,11 @@ export const DriverDashboard: React.FC = () => {
 
       if (availableResponse.status === 'success') {
         const newOrders = availableResponse.data || [];
-        // Check if there are new orders (notification)
         if (newOrders.length > availableOrders.length) {
           setNewOrderNotification(newOrders.length - availableOrders.length);
-          // Show browser notification if permission granted
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('New Order Available!', {
-              body: `You have ${newOrders.length} new order(s) available`,
+            new Notification('Pesanan Baru Tersedia! 🎉', {
+              body: `Anda memiliki ${newOrders.length} pesanan baru`,
               icon: '/favicon.ico',
             });
           }
@@ -78,192 +76,282 @@ export const DriverDashboard: React.FC = () => {
   };
 
   const handleAcceptOrder = async (orderId: number) => {
-    try {
-      const response = await driverAPI.acceptOrder(orderId);
-      if (response.status === 'success') {
-        await fetchOrders(); // Refresh orders
-        alert('Order accepted successfully!');
+    const result = await showConfirm(
+      'Terima Pesanan',
+      'Apakah Anda yakin ingin menerima pesanan ini?',
+      'Ya, Terima',
+      'Batal'
+    );
+
+    if (result.isConfirmed) {
+      try {
+        const response = await driverAPI.acceptOrder(orderId);
+        if (response.status === 'success') {
+          await showSuccess('Pesanan Berhasil Diterima! ✅');
+          await fetchOrders();
+        }
+      } catch (error: any) {
+        await showError('Gagal Menerima Pesanan', error.response?.data?.message || 'Terjadi kesalahan');
       }
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to accept order');
     }
   };
 
   const handleCompleteOrder = async (orderId: number) => {
-    try {
-      const response = await driverAPI.completeOrder(orderId);
-      if (response.status === 'success') {
-        await fetchOrders(); // Refresh orders
-        alert('Order completed successfully!');
+    const result = await showConfirm(
+      'Selesaikan Pesanan',
+      'Apakah Anda yakin pesanan sudah sampai di tujuan?',
+      'Ya, Selesaikan',
+      'Batal'
+    );
+
+    if (result.isConfirmed) {
+      try {
+        const response = await driverAPI.completeOrder(orderId);
+        if (response.status === 'success') {
+          await showSuccess('Pesanan Berhasil Diselesaikan! 🎉');
+          await fetchOrders();
+        }
+      } catch (error: any) {
+        await showError('Gagal Menyelesaikan Pesanan', error.response?.data?.message || 'Terjadi kesalahan');
       }
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to complete order');
     }
   };
 
   const getStatusLabel = (status: string) => {
     const labels: { [key: string]: string } = {
-      PENDING_PAYMENT: 'Pending Payment',
-      PAID: 'Paid',
-      PREPARING: 'Preparing',
-      ON_THE_WAY: 'On The Way',
-      DELIVERED: 'Delivered',
-      PAYMENT_FAILED: 'Payment Failed',
+      PENDING_PAYMENT: 'Menunggu Pembayaran',
+      PAID: 'Sudah Dibayar',
+      PREPARING: 'Sedang Disiapkan',
+      ON_THE_WAY: 'Dalam Perjalanan',
+      DELIVERED: 'Selesai',
+      PAYMENT_FAILED: 'Pembayaran Gagal',
     };
     return labels[status] || status;
   };
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">Loading orders...</div>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+          <p className="text-gray-600">Memuat pesanan...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Driver Dashboard</h1>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <div className="container mx-auto px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Driver Dashboard 🚗</h1>
+          <p className="text-gray-600">Kelola pesanan dan pengiriman Anda</p>
+        </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Available Orders */}
-        <div>
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-              Available Orders
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-orange-100 text-sm font-medium">Pesanan Tersedia</span>
+              <span className="text-2xl">📦</span>
+            </div>
+            <p className="text-3xl font-bold">{availableOrders.length}</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-100 text-sm font-medium">Pesanan Aktif</span>
+              <span className="text-2xl">🚚</span>
+            </div>
+            <p className="text-3xl font-bold">{myOrders.length}</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-green-100 text-sm font-medium">Status</span>
+              <span className="text-2xl">✅</span>
+            </div>
+            <p className="text-xl font-bold">
+              {myOrders.length > 0 ? 'Sedang Bekerja' : 'Siap Menerima Pesanan'}
+            </p>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Available Orders */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Pesanan Tersedia</h2>
               {availableOrders.length > 0 && (
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="ml-2 bg-red-500 text-white rounded-full px-3 py-1 text-sm font-bold animate-pulse"
+                  className="bg-red-500 text-white rounded-full px-4 py-2 text-sm font-bold animate-pulse flex items-center gap-2"
                 >
-                  🔔 {availableOrders.length} New Order{availableOrders.length > 1 ? 's' : ''}
+                  🔔 {availableOrders.length} Baru
                 </motion.span>
               )}
-            </h2>
+            </div>
 
             {availableOrders.length === 0 ? (
-              <p className="text-gray-600 text-center py-8">No available orders</p>
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4">📭</div>
+                <p className="text-gray-600">Tidak ada pesanan tersedia</p>
+              </div>
             ) : (
-              <div className="space-y-4">
-                {availableOrders.map((order) => (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {availableOrders.map((order, index) => (
                   <motion.div
                     key={order.order_id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                    transition={{ delay: index * 0.1 }}
+                    className="border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-white"
                   >
-                    <div className="flex justify-between items-start mb-3">
+                    <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="font-semibold text-gray-800">Order #{order.order_id}</h3>
-                        <p className="text-sm text-gray-600">{order.restaurant_name}</p>
+                        <h3 className="text-lg font-bold text-gray-900">Order #{order.order_id}</h3>
+                        <p className="text-sm text-gray-600 mt-1">🍽️ {order.restaurant_name}</p>
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          statusColors[order.status] || 'bg-gray-100 text-gray-800'
+                        className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                          statusColors[order.status] || 'bg-gray-100 text-gray-800 border-gray-300'
                         }`}
                       >
                         {getStatusLabel(order.status)}
                       </span>
                     </div>
 
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Customer:</span> {order.customer_name}
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">👤 Customer:</span> {order.customer_name}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Address:</span> {order.customer_address}
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">📍 Alamat:</span> {order.customer_address}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Total:</span>{' '}
-                        <span className="font-bold text-primary-600">
-                          Rp {order.total_price.toLocaleString()}
-                        </span>
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">💰 Total:</span>{' '}
+                        <span className="font-bold text-green-600">{formatRupiah(order.total_price)}</span>
                       </p>
                     </div>
 
-                    <div className="mb-3">
-                      <p className="text-sm font-medium text-gray-700 mb-1">Items:</p>
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">Items:</p>
                       {order.items.map((item, idx) => (
-                        <p key={idx} className="text-sm text-gray-600">
-                          {item.menu_item_name} × {item.quantity}
+                        <p key={idx} className="text-xs text-gray-600">
+                          • {item.menu_item_name} × {item.quantity}
                         </p>
                       ))}
                     </div>
 
                     <Button
                       variant="primary"
-                      size="sm"
                       className="w-full"
                       onClick={() => handleAcceptOrder(order.order_id)}
                     >
-                      Accept Order
+                      ✅ Terima Pesanan
                     </Button>
                   </motion.div>
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </motion.div>
 
-        {/* My Orders */}
-        <div>
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">My Active Orders</h2>
+          {/* My Orders */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Pesanan Saya</h2>
 
             {myOrders.length === 0 ? (
-              <p className="text-gray-600 text-center py-8">No active orders</p>
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4">📋</div>
+                <p className="text-gray-600">Tidak ada pesanan aktif</p>
+              </div>
             ) : (
-              <div className="space-y-4">
-                {myOrders.map((order) => (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {myOrders.map((order, index) => (
                   <motion.div
                     key={order.order_id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 border border-primary-200 bg-primary-50 rounded-lg"
+                    transition={{ delay: index * 0.1 }}
+                    className="border-2 border-green-300 rounded-xl p-5 bg-gradient-to-br from-green-50 to-white"
                   >
-                    <div className="flex justify-between items-start mb-3">
+                    <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h3 className="font-semibold text-gray-800">Order #{order.order_id}</h3>
-                        <p className="text-sm text-gray-600">{order.restaurant_name}</p>
+                        <h3 className="text-lg font-bold text-gray-900">Order #{order.order_id}</h3>
+                        <p className="text-sm text-gray-600 mt-1">🍽️ {order.restaurant_name}</p>
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          statusColors[order.status] || 'bg-gray-100 text-gray-800'
+                        className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                          statusColors[order.status] || 'bg-gray-100 text-gray-800 border-gray-300'
                         }`}
                       >
                         {getStatusLabel(order.status)}
                       </span>
                     </div>
 
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Customer:</span> {order.customer_name}
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">👤 Customer:</span> {order.customer_name}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Address:</span> {order.customer_address}
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">📍 Alamat:</span> {order.customer_address}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Total:</span>{' '}
-                        <span className="font-bold text-primary-600">
-                          Rp {order.total_price.toLocaleString()}
-                        </span>
+                      <p className="text-sm text-gray-700">
+                        <span className="font-semibold">💰 Total:</span>{' '}
+                        <span className="font-bold text-green-600">{formatRupiah(order.total_price)}</span>
                       </p>
                     </div>
 
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => handleCompleteOrder(order.order_id)}
-                    >
-                      Mark as Delivered
-                    </Button>
+                    <div className="mb-4 p-3 bg-white rounded-lg">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">Items:</p>
+                      {order.items.map((item, idx) => (
+                        <p key={idx} className="text-xs text-gray-600">
+                          • {item.menu_item_name} × {item.quantity}
+                        </p>
+                      ))}
+                    </div>
+
+                    {order.status === 'ON_THE_WAY' && (
+                      <Button
+                        variant="primary"
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={() => handleCompleteOrder(order.order_id)}
+                      >
+                        ✅ Tandai Selesai
+                      </Button>
+                    )}
                   </motion.div>
                 ))}
               </div>
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>

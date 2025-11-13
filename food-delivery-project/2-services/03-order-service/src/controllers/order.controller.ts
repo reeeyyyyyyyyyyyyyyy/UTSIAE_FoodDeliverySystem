@@ -196,18 +196,16 @@ export class OrderController {
         });
         customerName = userResponse?.data?.data?.name || 'Unknown';
         
-        // Path: /users/addresses (because userRoutes is mounted at /users)
-        const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
-          headers: { Authorization: req.headers.authorization },
+        // Path: /users/internal/addresses/:id (internal SOA endpoint, no auth needed)
+        const addressResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/addresses/${order.address_id}`, {
           timeout: 5000,
         });
-        const addresses = addressesResponse.data.data;
-        const address = addresses.find((a: any) => a.id === order.address_id);
-        if (address) {
-          deliveryAddress = address.full_address;
+        if (addressResponse.data.status === 'success' && addressResponse.data.data) {
+          deliveryAddress = addressResponse.data.data.full_address;
+          console.log(`✅ SOA: Fetched address for order ${order.id}: ${deliveryAddress}`);
         }
-      } catch (error) {
-        console.error('Failed to fetch address:', error);
+      } catch (error: any) {
+        console.error(`❌ SOA: Failed to fetch address ${order.address_id} for order ${order.id}:`, error.message);
       }
 
       // Get driver details if order is assigned (SOA: Order Service calls Driver Service)
@@ -279,21 +277,19 @@ export class OrderController {
             });
             const customerName = userResponse.data.data.name;
 
-            // Get customer address
+            // Get customer address (SOA: Order Service calls User Service internal endpoint)
             let customerAddress = 'Unknown';
             try {
-              // Path: /users/addresses (because userRoutes is mounted at /users)
-              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
-                headers: { Authorization: req.headers.authorization },
+              // Path: /users/internal/addresses/:id (internal SOA endpoint, no auth needed)
+              const addressResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/addresses/${order.address_id}`, {
                 timeout: 5000,
               });
-              const addresses = addressesResponse.data.data;
-              const address = addresses.find((a: any) => a.id === order.address_id);
-              if (address) {
-                customerAddress = address.full_address;
+              if (addressResponse.data.status === 'success' && addressResponse.data.data) {
+                customerAddress = addressResponse.data.data.full_address;
+                console.log(`✅ SOA: Fetched address for order ${order.id}: ${customerAddress}`);
               }
-            } catch (error) {
-              console.error('Failed to fetch address:', error);
+            } catch (error: any) {
+              console.error(`❌ SOA: Failed to fetch address ${order.address_id} for order ${order.id}:`, error.message);
             }
 
             // Get order items
@@ -517,6 +513,22 @@ export class OrderController {
       // Update order status to DELIVERED
       await OrderModel.updateStatus(orderId, 'DELIVERED');
 
+      // SOA: Update driver total_earnings in Driver Service
+      // Driver earns 20,000 per order (fixed rate, not based on order total_price)
+      const driverEarningPerOrder = 20000; // Fixed: 20rb per order
+      try {
+        // Path: /drivers/internal/drivers/:id/update-earnings
+        await axios.post(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/${driverId}/update-earnings`, {
+          amount: driverEarningPerOrder, // Fixed: 20rb per order
+        }, {
+          timeout: 5000,
+        });
+        console.log(`✅ SOA: Updated driver ${driverId} earnings by Rp ${driverEarningPerOrder.toLocaleString()} (20rb per order)`);
+      } catch (error: any) {
+        console.error(`⚠️  SOA: Failed to update driver earnings for driver ${driverId}:`, error.message);
+        // Don't fail the order completion if earnings update fails
+      }
+
       const updatedOrder = await OrderModel.findById(orderId);
 
       res.json({
@@ -597,18 +609,16 @@ export class OrderController {
 
             let customerAddress = 'Unknown';
             try {
-              // Path: /users/addresses (because userRoutes is mounted at /users)
-              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
-                headers: { Authorization: req.headers.authorization },
+              // Path: /users/internal/addresses/:id (internal SOA endpoint, no auth needed)
+              const addressResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/addresses/${order.address_id}`, {
                 timeout: 5000,
               });
-              const addresses = addressesResponse.data.data;
-              const address = addresses.find((a: any) => a.id === order.address_id);
-              if (address) {
-                customerAddress = address.full_address;
+              if (addressResponse.data.status === 'success' && addressResponse.data.data) {
+                customerAddress = addressResponse.data.data.full_address;
+                console.log(`✅ SOA: Fetched address for order ${order.id}: ${customerAddress}`);
               }
-            } catch (error) {
-              console.error('Failed to fetch address:', error);
+            } catch (error: any) {
+              console.error(`❌ SOA: Failed to fetch address ${order.address_id} for order ${order.id}:`, error.message);
             }
 
             const orderItems = await OrderModel.findItemsByOrderId(order.id);
@@ -887,7 +897,8 @@ export class OrderController {
     }
   }
 
-  static async getDriverOrdersInternal(req: AuthRequest, res: Response): Promise<void> {
+  // Internal endpoint for SOA communication (no authentication required)
+  static async getDriverOrdersInternal(req: Request, res: Response): Promise<void> {
     try {
       const driverId = parseInt(req.params.driverId);
 
@@ -980,7 +991,8 @@ export class OrderController {
     }
   }
 
-  static async getUserOrdersInternal(req: AuthRequest, res: Response): Promise<void> {
+  // Internal endpoint for SOA communication (no authentication required)
+  static async getUserOrdersInternal(req: Request, res: Response): Promise<void> {
     try {
       const userId = parseInt(req.params.userId);
 

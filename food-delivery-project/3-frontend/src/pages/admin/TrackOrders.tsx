@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { orderAPI } from '../../services/api';
+import { formatRupiah } from '../../utils/format';
 
 interface Order {
   order_id: number;
@@ -161,7 +162,7 @@ export const TrackOrders: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    Rp {order.total_price.toLocaleString()}
+                    {formatRupiah(order.total_price)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {new Date(order.created_at).toLocaleString()}

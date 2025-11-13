@@ -58,6 +58,16 @@ router.post('/', authenticateToken, OrderController.createOrder);
  */
 router.get('/', authenticateToken, OrderController.getOrders);
 
+// Driver routes (MUST BE BEFORE /:id to avoid route conflict)
+router.get('/available', authenticateToken, authorizeDriver, OrderController.getAvailableOrders);
+router.get('/driver/my-orders', authenticateToken, authorizeDriver, OrderController.getDriverOrders);
+
+// Admin routes (MUST BE BEFORE /:id to avoid route conflict)
+router.get('/admin/dashboard/stats', authenticateToken, authorizeAdmin, OrderController.getDashboardStats);
+router.get('/admin/sales/statistics', authenticateToken, authorizeAdmin, OrderController.getSalesStatistics);
+router.get('/admin/sales/restaurants', authenticateToken, authorizeAdmin, OrderController.getRestaurantSales);
+router.get('/admin/all', authenticateToken, authorizeAdmin, OrderController.getAllOrders);
+
 /**
  * @swagger
  * /{id}:
@@ -80,22 +90,16 @@ router.get('/', authenticateToken, OrderController.getOrders);
  */
 router.get('/:id', authenticateToken, OrderController.getOrderById);
 
-// Driver routes
-router.get('/available', authenticateToken, authorizeDriver, OrderController.getAvailableOrders);
-router.get('/driver/my-orders', authenticateToken, authorizeDriver, OrderController.getDriverOrders);
+// Driver routes (accept, complete - these use :id so must be after /:id)
 router.post('/:id/accept', authenticateToken, authorizeDriver, OrderController.acceptOrder);
 router.post('/:id/complete', authenticateToken, authorizeDriver, OrderController.completeOrder);
 
-// Admin routes
-router.get('/admin/dashboard/stats', authenticateToken, authorizeAdmin, OrderController.getDashboardStats);
-router.get('/admin/sales/statistics', authenticateToken, authorizeAdmin, OrderController.getSalesStatistics);
-router.get('/admin/sales/restaurants', authenticateToken, authorizeAdmin, OrderController.getRestaurantSales);
-router.get('/admin/all', authenticateToken, authorizeAdmin, OrderController.getAllOrders);
 
-// Internal routes
+// Internal routes (for SOA communication between services)
+// These endpoints should NOT require authentication as they are service-to-service calls
 router.post('/internal/callback/payment', OrderController.paymentCallback);
-router.get('/internal/orders/user/:userId', authenticateToken, OrderController.getUserOrdersInternal);
-router.get('/internal/orders/driver/:driverId', authenticateToken, OrderController.getDriverOrdersInternal);
+router.get('/internal/orders/user/:userId', OrderController.getUserOrdersInternal); // Removed authenticateToken for SOA
+router.get('/internal/orders/driver/:driverId', OrderController.getDriverOrdersInternal); // Removed authenticateToken for SOA
 
 export default router;
 

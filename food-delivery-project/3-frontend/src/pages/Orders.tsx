@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { orderAPI } from '../services/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { formatRupiah } from '../utils/format';
 
 interface Order {
   order_id: number;
@@ -120,7 +121,7 @@ export const Orders: React.FC = () => {
                   <p className="text-gray-600 mb-4">
                     <span className="font-medium">Total:</span>{' '}
                     <span className="text-primary-600 font-bold">
-                      Rp {order.total_price.toLocaleString()}
+                      {formatRupiah(order.total_price)}
                     </span>
                   </p>
                   <p className="text-sm text-gray-500">

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { authAPI, userAPI } from '../services/api';
 
 interface User {
@@ -9,11 +10,19 @@ interface User {
   role?: string;
 }
 
+interface JWTPayload {
+  id: number;
+  email: string;
+  role: string;
+  exp?: number;
+  iat?: number;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ role: string }>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<{ role: string }>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -28,18 +37,71 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if user is already logged in from localStorage
     const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (storedToken && storedUser) {
-      setToken(storedToken);
+    
+    if (storedToken) {
       try {
-        setUser(JSON.parse(storedUser));
+        // Decode token to get user info
+        const decoded = jwtDecode<JWTPayload>(storedToken);
+        
+        // Check if token is expired
+        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+          // Token expired, remove it
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          return;
+        }
+        
+        // Set token
+        setToken(storedToken);
+        
+        // Try to get user from localStorage first
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
+          } catch (error) {
+            console.error('Failed to parse user data:', error);
+            // If parsing fails, create minimal user from token
+            const minimalUser: User = {
+              id: decoded.id,
+              email: decoded.email,
+              name: decoded.email.split('@')[0],
+              role: decoded.role,
+            };
+            setUser(minimalUser);
+            localStorage.setItem('user', JSON.stringify(minimalUser));
+          }
+        } else {
+          // If no user in localStorage, create minimal user from token
+          const minimalUser: User = {
+            id: decoded.id,
+            email: decoded.email,
+            name: decoded.email.split('@')[0],
+            role: decoded.role,
+          };
+          setUser(minimalUser);
+          localStorage.setItem('user', JSON.stringify(minimalUser));
+        }
+        
+        // Fetch full user profile in background
+        userAPI.getProfile()
+          .then((response) => {
+            if (response.status === 'success' && response.data) {
+              setUser(response.data);
+              localStorage.setItem('user', JSON.stringify(response.data));
+            }
+          })
+          .catch((error) => {
+            console.warn('Failed to fetch user profile on mount:', error);
+            // Keep using minimal user from token
+          });
       } catch (error) {
-        console.error('Failed to parse user data:', error);
-        localStorage.removeItem('user');
+        console.error('Failed to decode token:', error);
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
     }
   }, []);
@@ -60,18 +122,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.status === 'success' && response.data?.token) {
         const token = response.data.token;
         console.log('🔑 Token received, length:', token.length);
+        
+        // Decode token to get user info immediately
+        const decoded = jwtDecode<JWTPayload>(token);
+        
+        // Set token and save to localStorage
         setToken(token);
         localStorage.setItem('token', token);
 
-        // Fetch user profile - retry if needed with timeout, but don't block login
-        // Login should succeed even if profile fetch fails
+        // Create minimal user from token immediately
+        const minimalUser: User = {
+          id: decoded.id,
+          email: decoded.email,
+          name: decoded.email.split('@')[0],
+          role: decoded.role,
+        };
+        setUser(minimalUser);
+        localStorage.setItem('user', JSON.stringify(minimalUser));
+
+        // Fetch full user profile in background
         try {
-          // Wait a bit for token to be set in interceptor
           await new Promise(resolve => setTimeout(resolve, 500));
           
           console.log('📋 Fetching user profile...');
           
-          // Add timeout to profile fetch
           const profilePromise = userAPI.getProfile();
           const profileTimeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
@@ -85,21 +159,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData));
             console.log('✅ User logged in successfully:', userData);
-          } else {
-            throw new Error('Invalid profile response');
+            // Return role for redirect
+            return { role: userData.role || decoded.role };
           }
         } catch (error: any) {
-          // Profile fetch failed - use minimal user data but don't fail login
-          console.warn('⚠️ Profile fetch failed, using minimal user data:', error.message);
-          const minimalUser = {
-            id: 0,
-            name: email.split('@')[0],
-            email: email,
-          };
-          setUser(minimalUser);
-          localStorage.setItem('user', JSON.stringify(minimalUser));
-          // Login still succeeds with minimal data
+          console.warn('⚠️ Profile fetch failed, using minimal user data from token:', error.message);
+          // Login still succeeds with minimal data from token
         }
+        
+        // Return role from token for redirect
+        return { role: decoded.role };
       } else {
         console.error('❌ Login failed - no token in response');
         throw new Error(response.message || 'Login failed - no token received');
@@ -128,12 +197,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Auto login after registration
         console.log('🔄 Auto-login after registration...');
         try {
-          await login(email, password);
+          const loginResult = await login(email, password);
+          return loginResult; // Return role for redirect
         } catch (loginError: any) {
           // If auto-login fails, registration still succeeded
           console.warn('⚠️ Auto-login failed after registration:', loginError.message);
-          // Don't throw - registration was successful
-          // User can manually login later
+          // Return default customer role since new registration is always customer
+          return { role: 'CUSTOMER' };
         }
       } else {
         throw new Error(response.message || 'Registration failed');
@@ -152,9 +222,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('user');
   };
 
-  const isAdmin = user?.role === 'admin';
-  const isDriver = user?.role === 'driver';
-  const isCustomer = !isAdmin && !isDriver;
+  // Normalize role to uppercase for comparison
+  const userRole = user?.role?.toUpperCase();
+  const isAdmin = userRole === 'ADMIN';
+  const isDriver = userRole === 'DRIVER';
+  const isCustomer = userRole === 'CUSTOMER' || (!isAdmin && !isDriver);
 
   return (
     <AuthContext.Provider

@@ -12,20 +12,17 @@ export const RoleRedirect: React.FC<{ children: React.ReactNode }> = ({ children
 
     const currentPath = location.pathname;
     
-    // Don't redirect if already on correct dashboard or public pages
-    if (currentPath === '/login' || currentPath === '/register') {
-      return;
-    }
-
-    // Don't redirect if on profile, orders, browse, or restaurant detail pages
+    // Don't redirect if on profile, orders, browse, restaurant detail, payment, invoice pages
     if (currentPath === '/profile' || 
         currentPath.startsWith('/orders') || 
         currentPath === '/browse' || 
-        currentPath.startsWith('/restaurants/')) {
+        currentPath.startsWith('/restaurants/') ||
+        currentPath.startsWith('/payment/') ||
+        currentPath.startsWith('/invoice/')) {
       return;
     }
 
-    // Only redirect from root path based on role
+    // Redirect from root path (Welcome page) to appropriate dashboard based on role
     if (currentPath === '/') {
       if (isAdmin) {
         navigate('/admin', { replace: true });

@@ -68,8 +68,7 @@ async function migrate() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (driver_id) REFERENCES drivers(id) ON DELETE CASCADE,
         INDEX idx_driver_id (driver_id),
-        INDEX idx_month_year (month, year),
-        UNIQUE KEY unique_driver_month_year (driver_id, month, year)
+        INDEX idx_month_year (month, year)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
     console.log('✅ Tables created');
@@ -148,34 +147,67 @@ async function migrate() {
       console.log(`✅ Driver data inserted for ${driverUsers.length} drivers`);
     }
 
-    // Get driver IDs for salary insertion
-    const [drivers] = await connection.query('SELECT id, user_id FROM drivers LIMIT 2');
-    const driverList = drivers as Array<{ id: number; user_id: number }>;
-
-    if (driverList.length > 0) {
-      console.log('📝 Inserting driver salary data...');
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth() + 1;
-      const currentYear = currentDate.getFullYear();
-
-      // Insert sample salaries for current month
-      for (const driver of driverList) {
-        await connection.query(`
-          INSERT IGNORE INTO driver_salaries (driver_id, month, year, base_salary, commission, total_orders, total_earnings, status) VALUES
-          (?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          driver.id,
-          currentMonth,
-          currentYear,
-          2000000.00, // base salary
-          500000.00, // commission
-          10, // total orders
-          2500000.00, // total earnings
-          'PENDING'
-        ]);
-      }
-      console.log('✅ Driver salary data inserted');
+    // Step 1: Reset all driver total_earnings to 0 first (fresh start)
+    console.log('📊 Resetting all driver total_earnings to 0.00 (fresh start)...');
+    try {
+      await connection.query('UPDATE drivers SET total_earnings = 0.00');
+      console.log('  ✅ All driver earnings reset to 0.00');
+    } catch (error: any) {
+      console.warn('⚠️  Could not reset earnings:', error.message);
     }
+
+    // Step 2: SOA: Calculate total_earnings from actual orders in order_service_db
+    // Driver earns 20,000 per order (fixed rate, not based on order total_price)
+    console.log('📊 Calculating driver total_earnings from Order Service (SOA)...');
+    console.log('   Note: Driver earns Rp 20,000 per delivered order (fixed rate)');
+    try {
+      // Query order_service_db to get order count for each driver
+      const [earningsRows] = await connection.query(`
+        SELECT 
+          driver_id,
+          COUNT(*) as total_orders
+        FROM order_service_db.orders
+        WHERE driver_id IS NOT NULL 
+          AND status = 'DELIVERED'
+        GROUP BY driver_id
+      `) as any[];
+
+      if (earningsRows && earningsRows.length > 0) {
+        const driverEarningPerOrder = 20000; // Fixed: 20rb per order
+        const earningsMap = new Map<number, { total_orders: number; total_earnings: number }>();
+        earningsRows.forEach((row: any) => {
+          const totalOrders = row.total_orders || 0;
+          const totalEarnings = totalOrders * driverEarningPerOrder; // 20rb per order
+          earningsMap.set(row.driver_id, {
+            total_orders: totalOrders,
+            total_earnings: totalEarnings,
+          });
+        });
+
+        // Update driver total_earnings based on actual orders
+        const [allDrivers] = await connection.query('SELECT id FROM drivers') as any[];
+        for (const driver of allDrivers) {
+          const earnings = earningsMap.get(driver.id);
+          if (earnings) {
+            await connection.query(
+              'UPDATE drivers SET total_earnings = ? WHERE id = ?',
+              [earnings.total_earnings, driver.id]
+            );
+            console.log(`  ✅ Updated driver ${driver.id}: ${earnings.total_orders} orders × Rp 20,000 = Rp ${earnings.total_earnings.toLocaleString()}`);
+          }
+        }
+        console.log('✅ Driver earnings updated from Order Service (20rb per order)');
+      } else {
+        console.log('  ℹ️  No delivered orders found. All drivers have total_earnings = 0.00');
+      }
+    } catch (error: any) {
+      console.warn('⚠️  Could not calculate earnings from order_service_db:', error.message);
+      console.warn('   All drivers will have total_earnings = 0.00 (fresh start)');
+    }
+
+    // Note: Driver salaries are created by admin via API, not during migration
+    // This follows SOA principle: salaries are calculated from actual orders when created
+    console.log('ℹ️  Driver salaries will be created by admin via API (uses real order data)');
 
     console.log('✅ Migration completed successfully!');
   } catch (error: any) {

@@ -101,6 +101,14 @@ export const userAPI = {
     const response = await api.post('/users/addresses', data);
     return response.data;
   },
+  updateAddress: async (id: number, data: { label: string; full_address: string; latitude?: number; longitude?: number; is_default?: boolean }) => {
+    const response = await api.put(`/users/addresses/${id}`, data);
+    return response.data;
+  },
+  deleteAddress: async (id: number) => {
+    const response = await api.delete(`/users/addresses/${id}`);
+    return response.data;
+  },
   // Admin endpoints
   getAllUsers: async () => {
     const response = await api.get('/users/admin/all');
@@ -231,6 +239,10 @@ export const driverAPI = {
   },
   updateSalaryStatus: async (salaryId: number, status: string) => {
     const response = await api.put(`/drivers/admin/salaries/${salaryId}/status`, { status });
+    return response.data;
+  },
+  markDriverEarningsAsPaid: async (driverId: number) => {
+    const response = await api.post(`/drivers/admin/salaries/mark-as-paid/${driverId}`);
     return response.data;
   },
 };

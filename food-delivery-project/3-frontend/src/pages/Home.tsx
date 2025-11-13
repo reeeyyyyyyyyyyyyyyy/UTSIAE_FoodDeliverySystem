@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { restaurantAPI } from '../services/api';
-import { Card } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
@@ -27,9 +26,9 @@ export const Home: React.FC = () => {
       try {
         const response = await restaurantAPI.getRestaurants(filter || undefined);
         if (response.status === 'success') {
-          // Remove duplicates by id
-          const uniqueRestaurants = (response.data || []).filter((r: Restaurant, index: number, self: Restaurant[]) => 
-            index === self.findIndex((rest) => rest.id === r.id)
+          const uniqueRestaurants = (response.data || []).filter(
+            (r: Restaurant, index: number, self: Restaurant[]) =>
+              index === self.findIndex((rest) => rest.id === r.id)
           );
           setRestaurants(uniqueRestaurants);
         }
@@ -43,63 +42,41 @@ export const Home: React.FC = () => {
     fetchRestaurants();
   }, [filter]);
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-  };
-
   const cuisineTypes = ['All', 'Padang', 'Sunda', 'Jawa', 'Western', 'Fast Food'];
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading restaurants...</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mb-4"></div>
+          <p className="text-gray-600">Memuat restoran...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-12">
+      <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-orange-700 text-white py-16">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to Food Delivery</h1>
-            <p className="text-xl mb-6">Order your favorite food from the best restaurants</p>
+            <h1 className="text-5xl md:text-6xl font-bold mb-4">🍔 Food Delivery</h1>
+            <p className="text-xl md:text-2xl mb-8 text-orange-100">
+              Pesan makanan favoritmu dari restoran terbaik
+            </p>
             {!isAuthenticated && (
               <div className="flex gap-4 justify-center">
                 <Button
                   variant="secondary"
-                  onClick={() => navigate('/register')}
-                  className="bg-white text-primary-600 hover:bg-gray-100"
+                  onClick={() => navigate('/')}
+                  className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-3 text-lg"
                 >
-                  Get Started
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/login')}
-                  className="border-white text-white hover:bg-white hover:text-primary-600"
-                >
-                  Login
+                  Daftar Sekarang
                 </Button>
               </div>
             )}
@@ -107,94 +84,106 @@ export const Home: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-12">
         {/* Filter Section */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Browse Restaurants</h2>
-          <div className="flex flex-wrap gap-2">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h2 className="text-3xl font-bold text-gray-900 mb-6">Jelajahi Restoran</h2>
+          <div className="flex flex-wrap gap-3">
             {cuisineTypes.map((cuisine) => (
               <button
                 key={cuisine}
                 onClick={() => setFilter(cuisine === 'All' ? '' : cuisine)}
-                className={`px-4 py-2 rounded-full transition-colors ${
+                className={`px-6 py-3 rounded-full font-medium transition-all ${
                   filter === (cuisine === 'All' ? '' : cuisine)
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                    ? 'bg-orange-500 text-white shadow-lg scale-105'
+                    : 'bg-white text-gray-700 hover:bg-orange-50 hover:border-orange-300 border border-gray-200'
                 }`}
               >
                 {cuisine}
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Restaurants Grid */}
         {restaurants.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">No restaurants found</p>
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">🍽️</div>
+            <p className="text-gray-600 text-lg">Tidak ada restoran ditemukan</p>
           </div>
         ) : (
           <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            {restaurants.map((restaurant) => (
-              <motion.div key={restaurant.id} variants={item}>
-                <Card
-                  onClick={() => {
-                    if (isAuthenticated) {
-                      navigate(`/restaurants/${restaurant.id}`);
-                    } else {
-                      navigate('/login');
-                    }
-                  }}
-                  className="h-full cursor-pointer hover:shadow-xl transition-shadow"
-                >
-                  <div className="p-6">
-                    {restaurant.image_url && (
-                      <img 
-                        src={restaurant.image_url} 
-                        alt={restaurant.name}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
-                      />
-                    )}
-                    <div className="flex items-start justify-between mb-4">
-                      <h3 className="text-xl font-semibold text-gray-800">
-                        {restaurant.name}
-                      </h3>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          restaurant.is_open
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {restaurant.is_open ? 'Open' : 'Closed'}
-                      </span>
-                    </div>
-                    <p className="text-primary-600 font-medium mb-2">
-                      {restaurant.cuisine_type}
-                    </p>
-                    <p className="text-gray-600 text-sm mb-4">{restaurant.address}</p>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isAuthenticated) {
-                          navigate(`/restaurants/${restaurant.id}`);
-                        } else {
-                          navigate('/login');
-                        }
-                      }}
-                    >
-                      View Menu
-                    </Button>
+            {restaurants.map((restaurant, index) => (
+              <motion.div
+                key={restaurant.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+                onClick={() => {
+                  if (isAuthenticated) {
+                    navigate(`/restaurants/${restaurant.id}`);
+                  } else {
+                    navigate('/');
+                  }
+                }}
+              >
+                {restaurant.image_url ? (
+                  <div className="h-48 overflow-hidden">
+                    <img
+                      src={restaurant.image_url}
+                      alt={restaurant.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
                   </div>
-                </Card>
+                ) : (
+                  <div className="h-48 bg-gradient-to-br from-orange-200 to-orange-300 flex items-center justify-center">
+                    <span className="text-6xl">🍽️</span>
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors">
+                      {restaurant.name}
+                    </h3>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        restaurant.is_open
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {restaurant.is_open ? 'Buka' : 'Tutup'}
+                    </span>
+                  </div>
+                  <p className="text-orange-600 font-semibold mb-2 flex items-center gap-2">
+                    <span>📍</span> {restaurant.cuisine_type}
+                  </p>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{restaurant.address}</p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full group-hover:bg-orange-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isAuthenticated) {
+                        navigate(`/restaurants/${restaurant.id}`);
+                      } else {
+                        navigate('/');
+                      }
+                    }}
+                  >
+                    Lihat Menu →
+                  </Button>
+                </div>
               </motion.div>
             ))}
           </motion.div>
@@ -203,4 +192,3 @@ export const Home: React.FC = () => {
     </div>
   );
 };
-

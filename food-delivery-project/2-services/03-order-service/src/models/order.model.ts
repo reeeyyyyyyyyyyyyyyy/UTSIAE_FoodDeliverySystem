@@ -82,6 +82,14 @@ export class OrderModel {
     return rows as Order[];
   }
 
+  static async findRecentOrdersByUser(userId: number, restaurantId: number, seconds: number): Promise<Order[]> {
+    const [rows] = await pool.execute(
+      'SELECT * FROM orders WHERE user_id = ? AND restaurant_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) ORDER BY created_at DESC',
+      [userId, restaurantId, seconds]
+    );
+    return rows as Order[];
+  }
+
   static async findByStatus(status: string): Promise<Order[]> {
     const [rows] = await pool.execute('SELECT * FROM orders WHERE status = ? ORDER BY created_at ASC', [status]);
     return rows as Order[];
@@ -93,8 +101,16 @@ export class OrderModel {
   }
 
   static async findByDriverIdInternal(driverId: number): Promise<Order[]> {
-    const [rows] = await pool.execute('SELECT * FROM orders WHERE driver_id = ? ORDER BY created_at DESC', [driverId]);
-    return rows as Order[];
+    // Only return active orders (ON_THE_WAY, PREPARING) for the driver
+    // This ensures SOA communication returns only relevant active orders
+    // IMPORTANT: driver_id must match exactly (not NULL, not different driver)
+    const [rows] = await pool.execute(
+      'SELECT * FROM orders WHERE driver_id = ? AND status IN (?, ?) ORDER BY created_at DESC',
+      [driverId, 'ON_THE_WAY', 'PREPARING']
+    );
+    const orders = rows as Order[];
+    console.log(`📊 OrderModel.findByDriverIdInternal(driverId=${driverId}): Found ${orders.length} active orders`);
+    return orders;
   }
 
   static async findItemsByOrderId(orderId: number): Promise<OrderItem[]> {
@@ -132,7 +148,7 @@ export class OrderModel {
         SUM(total_price) as total_revenue,
         AVG(total_price) as avg_order_value
       FROM orders
-      WHERE status = 'DELIVERED'
+      WHERE status IN ('DELIVERED', 'PREPARING', 'ON_THE_WAY', 'PAID')
     `;
     const params: any[] = [];
 
@@ -154,6 +170,7 @@ export class OrderModel {
   }
 
   static async getRestaurantSales(restaurantId?: number): Promise<any> {
+    // Include all orders (not just DELIVERED) to show all sales data
     let query = `
       SELECT 
         restaurant_id,
@@ -161,7 +178,7 @@ export class OrderModel {
         SUM(total_price) as total_revenue,
         AVG(total_price) as avg_order_value
       FROM orders
-      WHERE status = 'DELIVERED'
+      WHERE status IN ('DELIVERED', 'PREPARING', 'ON_THE_WAY', 'PAID', 'PENDING_PAYMENT')
     `;
     const params: any[] = [];
 
@@ -182,7 +199,8 @@ export class OrderModel {
   }
 
   static async getTotalRevenue(): Promise<number> {
-    const [rows] = await pool.execute("SELECT SUM(total_price) as total FROM orders WHERE status = 'DELIVERED'");
+    // Include all orders (not just DELIVERED) for total revenue calculation
+    const [rows] = await pool.execute("SELECT SUM(total_price) as total FROM orders");
     const result = rows as any[];
     return result[0]?.total || 0;
   }

@@ -44,3 +44,43 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* SweetAlert2 Custom Styles */
+.swal2-popup {
+  border-radius: 1rem !important;
+  font-family: inherit !important;
+}
+
+.swal2-toast {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+.swal2-popup-modern {
+  border-radius: 1rem !important;
+  padding: 2rem !important;
+}
+
+.swal2-confirm {
+  background-color: #f97316 !important;
+  border-color: #f97316 !important;
+  border-radius: 0.5rem !important;
+}
+
+.swal2-confirm:hover {
+  background-color: #ea580c !important;
+  border-color: #ea580c !important;
+}
+
+.swal2-cancel {
+  border-radius: 0.5rem !important;
+}
+
+.swal2-title {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+}
+
+.swal2-html-container {
+  color: #6b7280 !important;
+}

@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../services/api';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { AddressModal } from '../components/AddressModal';
+import { showSuccess, showError, showConfirm } from '../utils/swal';
 
 interface Address {
   id: number;
@@ -13,157 +14,225 @@ interface Address {
 }
 
 export const Profile: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [newAddress, setNewAddress] = useState({
-    label: '',
-    full_address: '',
-    is_default: false,
-  });
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
   useEffect(() => {
-    const fetchAddresses = async () => {
-      try {
-        const response = await userAPI.getAddresses();
-        if (response.status === 'success') {
-          setAddresses(response.data || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch addresses:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchAddresses();
   }, []);
 
-  const handleAddAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchAddresses = async () => {
     try {
-      const response = await userAPI.createAddress(newAddress);
+      setIsLoading(true);
+      const response = await userAPI.getAddresses();
       if (response.status === 'success') {
-        setAddresses([...addresses, response.data]);
-        setNewAddress({ label: '', full_address: '', is_default: false });
-        setShowAddAddress(false);
+        setAddresses(response.data || []);
       }
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to add address');
+    } catch (error) {
+      console.error('Failed to fetch addresses:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">My Profile</h1>
+  const handleAddAddress = async (addressData: {
+    label: string;
+    full_address: string;
+    is_default: boolean;
+  }) => {
+    await userAPI.createAddress(addressData);
+    await fetchAddresses();
+  };
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* User Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-6 rounded-lg shadow-md"
-        >
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">User Information</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Name</label>
-              <p className="text-gray-800">{user?.name}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Email</label>
-              <p className="text-gray-800">{user?.email}</p>
-            </div>
-            {user?.phone && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Phone</label>
-                <p className="text-gray-800">{user.phone}</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
+  const handleUpdateAddress = async (addressData: {
+    label: string;
+    full_address: string;
+    is_default: boolean;
+  }) => {
+    if (!editingAddress) return;
+    await userAPI.updateAddress(editingAddress.id, addressData);
+    await fetchAddresses();
+    setEditingAddress(null);
+  };
 
-        {/* Addresses */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-6 rounded-lg shadow-md"
-        >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Addresses</h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddAddress(!showAddAddress)}
-            >
-              {showAddAddress ? 'Cancel' : 'Add Address'}
-            </Button>
-          </div>
+  const handleDeleteAddress = async (id: number) => {
+    const result = await showConfirm(
+      'Hapus Alamat',
+      'Apakah Anda yakin ingin menghapus alamat ini?',
+      'Ya, Hapus',
+      'Batal'
+    );
 
-          {showAddAddress && (
-            <motion.form
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              onSubmit={handleAddAddress}
-              className="mb-4 space-y-3"
-            >
-              <Input
-                label="Label"
-                value={newAddress.label}
-                onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
-                placeholder="e.g., Home, Office"
-                required
-              />
-              <Input
-                label="Full Address"
-                value={newAddress.full_address}
-                onChange={(e) => setNewAddress({ ...newAddress, full_address: e.target.value })}
-                placeholder="Enter full address"
-                required
-              />
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={newAddress.is_default}
-                  onChange={(e) => setNewAddress({ ...newAddress, is_default: e.target.checked })}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-600">Set as default</span>
-              </label>
-              <Button type="submit" variant="primary" size="sm">
-                Add Address
-              </Button>
-            </motion.form>
-          )}
+    if (result.isConfirmed) {
+      try {
+        await userAPI.deleteAddress(id);
+        await showSuccess('Alamat Berhasil Dihapus! ✅');
+        await fetchAddresses();
+      } catch (error: any) {
+        await showError('Gagal Menghapus Alamat', error.response?.data?.message || 'Terjadi kesalahan');
+      }
+    }
+  };
 
-          <div className="space-y-3">
-            {isLoading ? (
-              <p className="text-gray-600">Loading addresses...</p>
-            ) : addresses.length === 0 ? (
-              <p className="text-gray-600">No addresses added yet</p>
-            ) : (
-              addresses.map((address) => (
-                <div
-                  key={address.id}
-                  className="p-3 border rounded-lg border-gray-200"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-gray-800">{address.label}</p>
-                      <p className="text-sm text-gray-600">{address.full_address}</p>
-                      {address.is_default && (
-                        <span className="text-xs text-primary-600">Default</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </motion.div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mb-4"></div>
+          <p className="text-gray-600">Memuat profil...</p>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
+      <div className="container mx-auto px-4 py-12 max-w-6xl">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Profile</h1>
+          <p className="text-gray-600">Kelola informasi dan alamat pengiriman Anda</p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* User Info Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-1"
+          >
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6">
+              <div className="text-center mb-6">
+                <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl text-white">
+                    {user?.name?.charAt(0).toUpperCase() || '👤'}
+                  </span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
+                <p className="text-gray-600">{user?.email}</p>
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Nama</label>
+                  <p className="text-gray-900 font-medium">{user?.name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Email</label>
+                  <p className="text-gray-900 font-medium">{user?.email}</p>
+                </div>
+                {user?.phone && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Telepon</label>
+                    <p className="text-gray-900 font-medium">{user.phone}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Role</label>
+                  <p className="text-gray-900 font-medium capitalize">{user?.role?.toLowerCase()}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Addresses Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-2"
+          >
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Alamat Pengiriman</h2>
+                  <p className="text-gray-600 text-sm mt-1">Kelola alamat untuk pengiriman pesanan</p>
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={() => setShowAddAddress(true)}
+                  className="flex items-center gap-2"
+                >
+                  <span>➕</span> Tambah Alamat
+                </Button>
+              </div>
+
+              {addresses.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-4">📍</div>
+                  <p className="text-gray-600 mb-4">Belum ada alamat tersimpan</p>
+                  <Button variant="primary" onClick={() => setShowAddAddress(true)}>
+                    Tambah Alamat Pertama
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {addresses.map((address) => (
+                    <motion.div
+                      key={address.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow relative"
+                    >
+                      {address.is_default && (
+                        <span className="absolute top-2 right-2 px-2 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full">
+                          Default
+                        </span>
+                      )}
+                      <h3 className="font-semibold text-gray-900 mb-2">{address.label}</h3>
+                      <p className="text-gray-600 text-sm mb-4">{address.full_address}</p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingAddress(address)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteAddress(address.id)}
+                          className="text-red-600 hover:bg-red-50 hover:border-red-300"
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Add Address Modal */}
+      <AddressModal
+        isOpen={showAddAddress}
+        onClose={() => setShowAddAddress(false)}
+        onSuccess={fetchAddresses}
+        onSubmit={handleAddAddress}
+        mode="add"
+      />
+
+      {/* Edit Address Modal */}
+      {editingAddress && (
+        <AddressModal
+          isOpen={!!editingAddress}
+          onClose={() => setEditingAddress(null)}
+          onSuccess={fetchAddresses}
+          onSubmit={handleUpdateAddress}
+          initialData={editingAddress}
+          mode="edit"
+        />
+      )}
     </div>
   );
 };
-
