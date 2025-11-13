@@ -88,7 +88,10 @@ export class OrderController {
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           try {
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
             return {
@@ -158,27 +161,45 @@ export class OrderController {
       // Get order items
       const orderItems = await OrderModel.findItemsByOrderId(orderId);
 
-      // Get restaurant details
+      // Get restaurant details (SOA: Order Service calls Restaurant Service)
+      // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
       let restaurantDetails = { name: 'Unknown', address: 'Unknown' };
       try {
-        const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+        const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+          timeout: 5000,
+        });
         const restaurantData = restaurantResponse.data.data;
-        const restaurantInfo = await axios.get(`${RESTAURANT_SERVICE_URL}/`);
-        const restaurants = restaurantInfo.data.data;
+        restaurantDetails = { name: restaurantData.restaurant_name || 'Unknown', address: 'Unknown' };
+        
+        // Get full restaurant info for address
+        const restaurantInfo = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants`, {
+          timeout: 5000,
+        });
+        const restaurants = restaurantInfo.data.data || [];
         const restaurant = restaurants.find((r: any) => r.id === order.restaurant_id);
         if (restaurant) {
-          restaurantDetails = { name: restaurant.name, address: restaurant.address };
+          restaurantDetails = { name: restaurant.name || restaurantData.restaurant_name, address: restaurant.address || 'Unknown' };
         }
       } catch (error) {
         console.error('Failed to fetch restaurant details:', error);
       }
 
-      // Get user address
+      // Get user address and customer name (SOA: Order Service calls User Service)
+      // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
       let deliveryAddress = 'Unknown';
+      let customerName = 'Unknown';
+      let userResponse: any = null;
+      
       try {
-        const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${userId}`);
-        const addressesResponse = await axios.get(`${USER_SERVICE_URL}/addresses`, {
+        userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${userId}`, {
+          timeout: 5000,
+        });
+        customerName = userResponse?.data?.data?.name || 'Unknown';
+        
+        // Path: /users/addresses (because userRoutes is mounted at /users)
+        const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
           headers: { Authorization: req.headers.authorization },
+          timeout: 5000,
         });
         const addresses = addressesResponse.data.data;
         const address = addresses.find((a: any) => a.id === order.address_id);
@@ -189,32 +210,39 @@ export class OrderController {
         console.error('Failed to fetch address:', error);
       }
 
-      // Get driver details if order is assigned
+      // Get driver details if order is assigned (SOA: Order Service calls Driver Service)
+      // Path: /drivers/internal/drivers/:id (because driverRoutes is mounted at /drivers)
       let driverDetails = null;
       if (order.driver_id) {
         try {
-          const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/${order.driver_id}`);
+          const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/${order.driver_id}`, {
+            timeout: 5000,
+          });
           driverDetails = driverResponse.data.data;
         } catch (error) {
           console.error('Failed to fetch driver details:', error);
         }
       }
-
+      
       res.json({
         status: 'success',
         data: {
           order_id: order.id,
+          restaurant_name: restaurantDetails.name,
+          customer_name: customerName,
+          customer_address: deliveryAddress,
           status: order.status,
           restaurant_details: restaurantDetails,
           delivery_address: deliveryAddress,
           driver_details: driverDetails,
           items: orderItems.map((item) => ({
-            name: item.menu_item_name,
+            menu_item_name: item.menu_item_name,
             quantity: item.quantity,
             price: item.price,
           })),
           total_price: order.total_price,
-          estimated_delivery: order.estimated_delivery_time,
+          estimated_delivery_time: order.estimated_delivery_time,
+          created_at: order.created_at,
         },
       });
     } catch (error: any) {
@@ -238,7 +266,10 @@ export class OrderController {
         orders.map(async (order) => {
           try {
             // Get restaurant details
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
             // Get customer details (SOA: Order Service calls User Service)
@@ -251,8 +282,10 @@ export class OrderController {
             // Get customer address
             let customerAddress = 'Unknown';
             try {
-              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/addresses`, {
+              // Path: /users/addresses (because userRoutes is mounted at /users)
+              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
                 headers: { Authorization: req.headers.authorization },
+                timeout: 5000,
               });
               const addresses = addressesResponse.data.data;
               const address = addresses.find((a: any) => a.id === order.address_id);
@@ -334,7 +367,10 @@ export class OrderController {
       // Get driver ID from user ID
       let driverId: number;
       try {
-        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        // Path: /drivers/internal/drivers/by-user/:userId (because driverRoutes is mounted at /drivers)
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/by-user/${userId}`, {
+          timeout: 5000,
+        });
         if (driverResponse.data.status === 'success' && driverResponse.data.data) {
           driverId = driverResponse.data.data.id;
         } else {
@@ -431,7 +467,10 @@ export class OrderController {
       // Get driver ID from user ID
       let driverId: number;
       try {
-        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        // Path: /drivers/internal/drivers/by-user/:userId (because driverRoutes is mounted at /drivers)
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/by-user/${userId}`, {
+          timeout: 5000,
+        });
         if (driverResponse.data.status === 'success' && driverResponse.data.data) {
           driverId = driverResponse.data.data.id;
         } else {
@@ -513,7 +552,10 @@ export class OrderController {
       // Get driver ID from user ID
       let driverId: number;
       try {
-        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/by-user/${userId}`);
+        // Path: /drivers/internal/drivers/by-user/:userId (because driverRoutes is mounted at /drivers)
+        const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/by-user/${userId}`, {
+          timeout: 5000,
+        });
         if (driverResponse.data.status === 'success' && driverResponse.data.data) {
           driverId = driverResponse.data.data.id;
         } else {
@@ -541,7 +583,10 @@ export class OrderController {
       const enrichedOrders = await Promise.all(
         activeOrders.map(async (order) => {
           try {
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
             // SOA: Order Service calls User Service
@@ -552,8 +597,10 @@ export class OrderController {
 
             let customerAddress = 'Unknown';
             try {
-              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/addresses`, {
+              // Path: /users/addresses (because userRoutes is mounted at /users)
+              const addressesResponse = await axios.get(`${USER_SERVICE_URL}/users/addresses`, {
                 headers: { Authorization: req.headers.authorization },
+                timeout: 5000,
               });
               const addresses = addressesResponse.data.data;
               const address = addresses.find((a: any) => a.id === order.address_id);
@@ -631,13 +678,13 @@ export class OrderController {
       const completedOrders = completedResult[0]?.count || 0;
 
       const [pendingResult] = await pool.execute(
-        'SELECT COUNT(*) as count FROM orders WHERE status IN (?, ?, ?)',
-        ['PENDING', 'PREPARING', 'ON_THE_WAY']
+        'SELECT COUNT(*) as count FROM orders WHERE status IN (?, ?, ?, ?)',
+        ['PENDING_PAYMENT', 'PAID', 'PREPARING', 'ON_THE_WAY']
       ) as any[];
       const pendingOrders = pendingResult[0]?.count || 0;
 
-      // Calculate average order value
-      const averageOrderValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;
+      // Calculate average order value from all orders (not just completed)
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
       // Get daily statistics
       const dailyStatistics = await OrderModel.getSalesStatistics(startDate, endDate);
@@ -667,10 +714,13 @@ export class OrderController {
     try {
       const restaurantId = req.query.restaurant_id ? parseInt(req.query.restaurant_id as string) : undefined;
       
-      // First, get all restaurants from Restaurant Service
+      // SOA: Get all restaurants from Restaurant Service
+      // Path: /restaurants (because restaurantRoutes is mounted at /restaurants)
       let allRestaurants: any[] = [];
       try {
-        const restaurantsResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants`);
+        const restaurantsResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants`, {
+          timeout: 5000,
+        });
         if (restaurantsResponse.data.status === 'success') {
           allRestaurants = restaurantsResponse.data.data || [];
         }
@@ -728,12 +778,14 @@ export class OrderController {
         orders.map(async (order) => {
           try {
             // SOA: Get restaurant details
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`, {
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
               timeout: 5000,
             });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
             // SOA: Get customer details
+            // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
             const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${order.user_id}`, {
               timeout: 5000,
             });
@@ -746,7 +798,8 @@ export class OrderController {
             if (order.driver_id) {
               try {
                 // Get driver from Driver Service
-                const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/internal/drivers/${order.driver_id}`, {
+                // Path: /drivers/internal/drivers/:id (because driverRoutes is mounted at /drivers)
+                const driverResponse = await axios.get(`${DRIVER_SERVICE_URL}/drivers/internal/drivers/${order.driver_id}`, {
                   timeout: 5000,
                 });
                 if (driverResponse.data.status === 'success' && driverResponse.data.data.user_id) {
@@ -847,20 +900,48 @@ export class OrderController {
       }
 
       const orders = await OrderModel.findByDriverIdInternal(driverId);
+      
+      console.log(`🔍 SOA Debug - getDriverOrdersInternal for driverId ${driverId}:`);
+      console.log(`   - Found ${orders.length} orders from database`);
+      console.log(`   - Orders:`, orders.map(o => ({
+        id: o.id,
+        driver_id: o.driver_id,
+        status: o.status,
+        driver_id_match: o.driver_id === driverId
+      })));
 
-      // Enrich with restaurant details
+      // Enrich with restaurant details, customer details, and driver_id
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           try {
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            // SOA: Get restaurant details
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
+
+            // SOA: Get customer details
+            // Path: /users/internal/users/:id (because userRoutes is mounted at /users)
+            let customerName = 'Unknown';
+            try {
+              const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${order.user_id}`, {
+                timeout: 5000,
+              });
+              customerName = userResponse.data.data.name || 'Unknown';
+            } catch (error) {
+              console.error('Failed to fetch customer name:', error);
+            }
 
             const orderItems = await OrderModel.findItemsByOrderId(order.id);
 
             return {
+              id: order.id,
               order_id: order.id,
+              driver_id: order.driver_id ? Number(order.driver_id) : null, // Ensure driver_id is number for SOA communication
+              customer_name: customerName,
               restaurant_name: restaurantName,
-              status: order.status,
+              status: order.status, // Status: ON_THE_WAY means driver has accepted
               total_price: order.total_price,
               items: orderItems.map((item) => ({
                 name: item.menu_item_name,
@@ -871,7 +952,10 @@ export class OrderController {
             };
           } catch (error) {
             return {
+              id: order.id,
               order_id: order.id,
+              driver_id: order.driver_id ? Number(order.driver_id) : null, // Ensure driver_id is number
+              customer_name: 'Unknown',
               restaurant_name: 'Unknown',
               status: order.status,
               total_price: order.total_price,
@@ -914,7 +998,10 @@ export class OrderController {
       const enrichedOrders = await Promise.all(
         orders.map(async (order) => {
           try {
-            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/${order.restaurant_id}/menu`);
+            // Path: /restaurants/:id/menu (because restaurantRoutes is mounted at /restaurants)
+            const restaurantResponse = await axios.get(`${RESTAURANT_SERVICE_URL}/restaurants/${order.restaurant_id}/menu`, {
+              timeout: 5000,
+            });
             const restaurantName = restaurantResponse.data.data.restaurant_name;
 
             const orderItems = await OrderModel.findItemsByOrderId(order.id);
