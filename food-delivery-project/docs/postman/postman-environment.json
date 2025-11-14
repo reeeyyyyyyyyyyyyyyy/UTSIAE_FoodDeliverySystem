@@ -1,0 +1,62 @@
+{
+	"id": "food-delivery-uts-environment",
+	"name": "Food Delivery System - Development",
+	"values": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "user_role",
+			"value": "",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "user_service_url",
+			"value": "http://localhost:3001",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "restaurant_service_url",
+			"value": "http://localhost:3002",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "order_service_url",
+			"value": "http://localhost:3003",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "payment_service_url",
+			"value": "http://localhost:3004",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "driver_service_url",
+			"value": "http://localhost:3005",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment"
+}
+
