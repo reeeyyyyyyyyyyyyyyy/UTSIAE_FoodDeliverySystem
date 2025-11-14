@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Package, Truck, CheckCircle, Bell, User, MapPin, DollarSign, ShoppingBag, Phone, Car } from 'lucide-react';
 import { driverAPI } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { formatRupiah } from '../utils/format';
@@ -55,7 +56,7 @@ export const DriverDashboard: React.FC = () => {
         if (newOrders.length > availableOrders.length) {
           setNewOrderNotification(newOrders.length - availableOrders.length);
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Pesanan Baru Tersedia! 🎉', {
+            new Notification('Pesanan Baru Tersedia!', {
               body: `Anda memiliki ${newOrders.length} pesanan baru`,
               icon: '/favicon.ico',
             });
@@ -87,7 +88,7 @@ export const DriverDashboard: React.FC = () => {
       try {
         const response = await driverAPI.acceptOrder(orderId);
         if (response.status === 'success') {
-          await showSuccess('Pesanan Berhasil Diterima! ✅');
+          await showSuccess('Pesanan Berhasil Diterima!', 'Pesanan telah ditambahkan ke daftar pesanan Anda.');
           await fetchOrders();
         }
       } catch (error: any) {
@@ -108,7 +109,7 @@ export const DriverDashboard: React.FC = () => {
       try {
         const response = await driverAPI.completeOrder(orderId);
         if (response.status === 'success') {
-          await showSuccess('Pesanan Berhasil Diselesaikan! 🎉');
+          await showSuccess('Pesanan Berhasil Diselesaikan!', 'Terima kasih atas kerja keras Anda!');
           await fetchOrders();
         }
       } catch (error: any) {
@@ -148,7 +149,10 @@ export const DriverDashboard: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Driver Dashboard 🚗</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <Truck className="w-10 h-10 text-green-600" />
+            Driver Dashboard
+          </h1>
           <p className="text-gray-600">Kelola pesanan dan pengiriman Anda</p>
         </motion.div>
 
@@ -161,7 +165,7 @@ export const DriverDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-orange-100 text-sm font-medium">Pesanan Tersedia</span>
-              <span className="text-2xl">📦</span>
+              <Package className="w-6 h-6" />
             </div>
             <p className="text-3xl font-bold">{availableOrders.length}</p>
           </motion.div>
@@ -174,7 +178,7 @@ export const DriverDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-blue-100 text-sm font-medium">Pesanan Aktif</span>
-              <span className="text-2xl">🚚</span>
+              <Truck className="w-6 h-6" />
             </div>
             <p className="text-3xl font-bold">{myOrders.length}</p>
           </motion.div>
@@ -187,7 +191,7 @@ export const DriverDashboard: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-green-100 text-sm font-medium">Status</span>
-              <span className="text-2xl">✅</span>
+              <CheckCircle className="w-6 h-6" />
             </div>
             <p className="text-xl font-bold">
               {myOrders.length > 0 ? 'Sedang Bekerja' : 'Siap Menerima Pesanan'}
@@ -210,14 +214,17 @@ export const DriverDashboard: React.FC = () => {
                   animate={{ scale: 1 }}
                   className="bg-red-500 text-white rounded-full px-4 py-2 text-sm font-bold animate-pulse flex items-center gap-2"
                 >
-                  🔔 {availableOrders.length} Baru
+                  <Bell className="w-4 h-4" />
+                  {availableOrders.length} Baru
                 </motion.span>
               )}
             </div>
 
             {availableOrders.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-5xl mb-4">📭</div>
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <Package className="w-8 h-8 text-gray-400" />
+                </div>
                 <p className="text-gray-600">Tidak ada pesanan tersedia</p>
               </div>
             ) : (
@@ -233,7 +240,10 @@ export const DriverDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900">Order #{order.order_id}</h3>
-                        <p className="text-sm text-gray-600 mt-1">🍽️ {order.restaurant_name}</p>
+                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                          <ShoppingBag className="w-4 h-4" />
+                          {order.restaurant_name}
+                        </p>
                       </div>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold border ${
@@ -245,14 +255,17 @@ export const DriverDashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-2 mb-4">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">👤 Customer:</span> {order.customer_name}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Customer:</span> {order.customer_name}
                       </p>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">📍 Alamat:</span> {order.customer_address}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Alamat:</span> {order.customer_address}
                       </p>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">💰 Total:</span>{' '}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Total:</span>{' '}
                         <span className="font-bold text-green-600">{formatRupiah(order.total_price)}</span>
                       </p>
                     </div>
@@ -268,10 +281,11 @@ export const DriverDashboard: React.FC = () => {
 
                     <Button
                       variant="primary"
-                      className="w-full"
+                      className="w-full flex items-center justify-center gap-2"
                       onClick={() => handleAcceptOrder(order.order_id)}
                     >
-                      ✅ Terima Pesanan
+                      <CheckCircle className="w-4 h-4" />
+                      Terima Pesanan
                     </Button>
                   </motion.div>
                 ))}
@@ -289,7 +303,9 @@ export const DriverDashboard: React.FC = () => {
 
             {myOrders.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-5xl mb-4">📋</div>
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <Package className="w-8 h-8 text-gray-400" />
+                </div>
                 <p className="text-gray-600">Tidak ada pesanan aktif</p>
               </div>
             ) : (
@@ -305,7 +321,10 @@ export const DriverDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900">Order #{order.order_id}</h3>
-                        <p className="text-sm text-gray-600 mt-1">🍽️ {order.restaurant_name}</p>
+                        <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                          <ShoppingBag className="w-4 h-4" />
+                          {order.restaurant_name}
+                        </p>
                       </div>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold border ${
@@ -317,14 +336,17 @@ export const DriverDashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-2 mb-4">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">👤 Customer:</span> {order.customer_name}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Customer:</span> {order.customer_name}
                       </p>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">📍 Alamat:</span> {order.customer_address}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Alamat:</span> {order.customer_address}
                       </p>
-                      <p className="text-sm text-gray-700">
-                        <span className="font-semibold">💰 Total:</span>{' '}
+                      <p className="text-sm text-gray-700 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">Total:</span>{' '}
                         <span className="font-bold text-green-600">{formatRupiah(order.total_price)}</span>
                       </p>
                     </div>
@@ -341,10 +363,11 @@ export const DriverDashboard: React.FC = () => {
                     {order.status === 'ON_THE_WAY' && (
                       <Button
                         variant="primary"
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        className="w-full bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
                         onClick={() => handleCompleteOrder(order.order_id)}
                       >
-                        ✅ Tandai Selesai
+                        <CheckCircle className="w-4 h-4" />
+                        Tandai Selesai
                       </Button>
                     )}
                   </motion.div>
@@ -357,4 +380,3 @@ export const DriverDashboard: React.FC = () => {
     </div>
   );
 };
-

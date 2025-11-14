@@ -12,6 +12,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { DriverDashboard } from './pages/DriverDashboard';
 import { CustomerDashboard } from './pages/CustomerDashboard';
 import { ManageUsers } from './pages/admin/ManageUsers';
+import { ManageRestaurants } from './pages/admin/ManageRestaurants';
 import { TrackDrivers } from './pages/admin/TrackDrivers';
 import { DriverSalaries } from './pages/admin/DriverSalaries';
 import { SalesStatistics } from './pages/admin/SalesStatistics';
@@ -95,7 +96,7 @@ const AppRoutes: React.FC = () => {
         element={
           <AdminRoute>
             <Navbar />
-            <AdminDashboard />
+            <ManageRestaurants />
           </AdminRoute>
         }
       />

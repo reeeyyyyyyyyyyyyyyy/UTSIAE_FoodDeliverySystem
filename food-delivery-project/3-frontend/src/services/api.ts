@@ -204,6 +204,14 @@ export const adminAPI = {
     const response = await api.put(`/restaurants/menu-items/${menuItemId}/stock`, { quantity });
     return response.data;
   },
+  deleteRestaurant: async (restaurantId: number) => {
+    const response = await api.delete(`/restaurants/${restaurantId}`);
+    return response.data;
+  },
+  deleteMenuItem: async (menuItemId: number) => {
+    const response = await api.delete(`/restaurants/menu-items/${menuItemId}`);
+    return response.data;
+  },
 };
 
 // Driver API

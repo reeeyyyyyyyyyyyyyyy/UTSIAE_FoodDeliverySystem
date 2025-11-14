@@ -37,26 +37,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialVi
     setShake(false);
 
     try {
-      const result = await login(loginEmail, loginPassword);
+      // Simulate delay untuk response lebih cepat
+      const [result] = await Promise.all([
+        login(loginEmail, loginPassword),
+        new Promise(resolve => setTimeout(resolve, 1000))
+      ]);
       const role = result.role?.toUpperCase() || 'CUSTOMER';
       
       // Show success with SweetAlert2
-      await showSuccess('Login Berhasil! 🎉', 'Selamat datang kembali!');
+      await showSuccess('Login Berhasil!', 'Selamat datang kembali!');
       
       onClose();
       setLoginEmail('');
       setLoginPassword('');
       
       // Redirect based on role
-      setTimeout(() => {
-        if (role === 'ADMIN') {
-          navigate('/admin');
-        } else if (role === 'DRIVER') {
-          navigate('/driver');
-        } else {
-          navigate('/browse');
-        }
-      }, 500);
+      if (role === 'ADMIN') {
+        navigate('/admin');
+      } else if (role === 'DRIVER') {
+        navigate('/driver');
+      } else {
+        navigate('/browse');
+      }
     } catch (err: any) {
       const errorMessage = err.message || 'Login gagal';
       await showError('Login Gagal', errorMessage);
@@ -73,11 +75,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialVi
     setShake(false);
 
     try {
-      const result = await register(registerName, registerEmail, registerPassword, registerPhone);
+      // Simulate delay untuk response lebih cepat
+      const [result] = await Promise.all([
+        register(registerName, registerEmail, registerPassword, registerPhone),
+        new Promise(resolve => setTimeout(resolve, 1000))
+      ]);
       const role = result.role?.toUpperCase() || 'CUSTOMER';
       
       // Show success with SweetAlert2
-      await showSuccess('Registrasi Berhasil! 🎉', 'Akun Anda telah dibuat!');
+      await showSuccess('Registrasi Berhasil!', 'Akun Anda telah dibuat!');
       
       onClose();
       setRegisterName('');
@@ -87,15 +93,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialVi
       setView('login');
       
       // Redirect based on role (usually CUSTOMER for new registration)
-      setTimeout(() => {
-        if (role === 'ADMIN') {
-          navigate('/admin');
-        } else if (role === 'DRIVER') {
-          navigate('/driver');
-        } else {
-          navigate('/browse');
-        }
-      }, 500);
+      if (role === 'ADMIN') {
+        navigate('/admin');
+      } else if (role === 'DRIVER') {
+        navigate('/driver');
+      } else {
+        navigate('/browse');
+      }
     } catch (err: any) {
       const errorMessage = err.message || 'Registrasi gagal';
       await showError('Registrasi Gagal', errorMessage);

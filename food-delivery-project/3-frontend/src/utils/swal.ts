@@ -1,25 +1,21 @@
 import Swal from 'sweetalert2';
 
 /**
- * Show success notification with SweetAlert2
+ * Show success notification with SweetAlert2 (modal di tengah)
  */
 export const showSuccess = (title: string, message?: string) => {
   return Swal.fire({
     icon: 'success',
     title,
     text: message,
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 3000,
-    timerProgressBar: true,
-    didOpen: (toast) => {
-      toast.addEventListener('mouseenter', Swal.stopTimer);
-      toast.addEventListener('mouseleave', Swal.resumeTimer);
-    },
+    showConfirmButton: true,
+    confirmButtonText: 'OKE',
+    confirmButtonColor: '#f97316',
     customClass: {
-      popup: 'swal2-toast',
+      popup: 'swal2-popup-modern',
     },
+    backdrop: true,
+    allowOutsideClick: false,
   });
 };
 

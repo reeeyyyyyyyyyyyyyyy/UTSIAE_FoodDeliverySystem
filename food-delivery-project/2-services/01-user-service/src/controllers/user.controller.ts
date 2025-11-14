@@ -130,6 +130,126 @@ export class UserController {
     }
   }
 
+  static async updateAddress(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const addressId = parseInt(req.params.id);
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      if (!addressId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Address ID is required',
+        });
+        return;
+      }
+
+      // Verify address belongs to user
+      const existingAddress = await AddressModel.findById(addressId);
+      if (!existingAddress || existingAddress.user_id !== userId) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Address not found',
+        });
+        return;
+      }
+
+      const { label, full_address, latitude, longitude, is_default } = req.body;
+
+      const addressData: Partial<AddressInput> = {};
+      if (label !== undefined) addressData.label = label;
+      if (full_address !== undefined) addressData.full_address = full_address;
+      if (latitude !== undefined) addressData.latitude = latitude;
+      if (longitude !== undefined) addressData.longitude = longitude;
+      if (is_default !== undefined) addressData.is_default = is_default;
+
+      const updatedAddress = await AddressModel.update(addressId, userId, addressData);
+
+      if (!updatedAddress) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Address not found',
+        });
+        return;
+      }
+
+      res.json({
+        status: 'success',
+        message: 'Address updated successfully',
+        data: updatedAddress,
+      });
+    } catch (error: any) {
+      console.error('Update address error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async deleteAddress(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      const addressId = parseInt(req.params.id);
+
+      if (!userId) {
+        res.status(401).json({
+          status: 'error',
+          message: 'Unauthorized',
+        });
+        return;
+      }
+
+      if (!addressId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Address ID is required',
+        });
+        return;
+      }
+
+      // Verify address belongs to user
+      const existingAddress = await AddressModel.findById(addressId);
+      if (!existingAddress || existingAddress.user_id !== userId) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Address not found',
+        });
+        return;
+      }
+
+      const deleted = await AddressModel.delete(addressId, userId);
+
+      if (!deleted) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Address not found',
+        });
+        return;
+      }
+
+      res.json({
+        status: 'success',
+        message: 'Address deleted successfully',
+      });
+    } catch (error: any) {
+      console.error('Delete address error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
   // Internal endpoint for other services
   static async getInternalUser(req: Request, res: Response): Promise<void> {
     try {

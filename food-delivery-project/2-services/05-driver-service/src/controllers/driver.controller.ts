@@ -19,7 +19,7 @@ interface AuthRequest extends Request {
 
 export class DriverController {
   // Admin endpoints
-  static async getAllDrivers(req: AuthRequest, res: Response): Promise<void> {
+  static async getAllDrivers(_req: AuthRequest, res: Response): Promise<void> {
     try {
       const drivers = await DriverModel.findAll();
 
@@ -221,7 +221,7 @@ export class DriverController {
             };
           } catch (error: any) {
             console.error(`❌ Failed to fetch user data for salary driver_id ${salary.driver_id}:`, error.message);
-            console.error(`   User Service URL: ${USER_SERVICE_URL}/users/internal/users/${driver?.user_id || 'N/A'}`);
+            console.error(`   User Service URL: ${USER_SERVICE_URL}/users/internal/users/${salary.driver_id || 'N/A'}`);
             return {
               id: salary.id,
               driver_id: salary.driver_id,
@@ -622,9 +622,11 @@ export class DriverController {
         return;
       }
 
-      // Enrich with user details
+      // Enrich with user details (SOA: Driver Service calls User Service)
       try {
-        const userResponse = await axios.get(`${USER_SERVICE_URL}/internal/users/${driver.user_id}`);
+        const userResponse = await axios.get(`${USER_SERVICE_URL}/users/internal/users/${driver.user_id}`, {
+          timeout: 5000,
+        });
         const userData = userResponse.data.data;
 
         res.json({
@@ -632,34 +634,37 @@ export class DriverController {
           data: {
             id: driver.id,
             user_id: driver.user_id,
-            name: userData.name,
-            email: userData.email,
-            phone: userData.phone,
+            name: userData.name || `Driver ${driver.id}`,
+            email: userData.email || '',
+            phone: userData.phone || '-',
             vehicle_type: driver.vehicle_type,
             vehicle_number: driver.vehicle_number,
+            vehicle: `${driver.vehicle_type} - ${driver.vehicle_number}`,
             is_available: driver.is_available,
             is_on_job: driver.is_on_job,
             total_earnings: driver.total_earnings,
             created_at: driver.created_at,
           },
         });
-      } catch (error) {
-      res.json({
-        status: 'success',
-        data: {
-          id: driver.id,
+      } catch (error: any) {
+        console.error('Failed to fetch user details for driver:', error);
+        res.json({
+          status: 'success',
+          data: {
+            id: driver.id,
             user_id: driver.user_id,
             name: 'Unknown',
-            email: 'Unknown',
-            phone: 'Unknown',
+            email: '',
+            phone: '-',
             vehicle_type: driver.vehicle_type,
             vehicle_number: driver.vehicle_number,
+            vehicle: `${driver.vehicle_type} - ${driver.vehicle_number}`,
             is_available: driver.is_available,
             is_on_job: driver.is_on_job,
             total_earnings: driver.total_earnings,
             created_at: driver.created_at,
-        },
-      });
+          },
+        });
       }
     } catch (error: any) {
       console.error('Get driver by ID error:', error);
@@ -670,6 +675,7 @@ export class DriverController {
       });
     }
   }
+
 
   // Driver profile endpoints
   static async getDriverProfile(req: AuthRequest, res: Response): Promise<void> {

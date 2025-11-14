@@ -180,11 +180,11 @@ export const Profile: React.FC = () => {
                       animate={{ opacity: 1, scale: 1 }}
                       className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow relative"
                     >
-                      {address.is_default && (
-                        <span className="absolute top-2 right-2 px-2 py-1 bg-orange-500 text-white text-xs font-semibold rounded-full">
-                          Default
-                        </span>
-                      )}
+                      <span className={`absolute top-2 right-2 px-2 py-1 text-white text-xs font-semibold rounded-full ${
+                        address.is_default ? 'bg-orange-500' : 'bg-gray-400'
+                      }`}>
+                        {address.is_default ? 'Default' : 'Tidak Default'}
+                      </span>
                       <h3 className="font-semibold text-gray-900 mb-2">{address.label}</h3>
                       <p className="text-gray-600 text-sm mb-4">{address.full_address}</p>
                       <div className="flex gap-2">

@@ -47,8 +47,10 @@ router.get('/:id/menu', RestaurantController.getRestaurantMenu);
 // Admin routes (require authentication and admin role)
 router.post('/', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.createRestaurant);
 router.put('/:id', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.updateRestaurant);
+router.delete('/:id', authenticateToken, authorizeAdmin, RestaurantController.deleteRestaurant);
 router.post('/:id/menu', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.createMenuItem);
 router.put('/menu-items/:id', authenticateToken, authorizeAdmin, upload.single('image'), RestaurantController.updateMenuItem);
+router.delete('/menu-items/:id', authenticateToken, authorizeAdmin, RestaurantController.deleteMenuItem);
 router.put('/menu-items/:id/stock', authenticateToken, authorizeAdmin, RestaurantController.restockMenuItem);
 router.put('/menu-items/:id/availability', authenticateToken, authorizeAdmin, RestaurantController.setMenuItemAvailability);
 

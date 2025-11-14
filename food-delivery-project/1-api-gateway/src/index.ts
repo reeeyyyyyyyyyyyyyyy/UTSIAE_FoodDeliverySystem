@@ -397,6 +397,41 @@ app.put(
   })
 );
 
+// Restaurant delete route
+app.delete(
+  '/api/restaurants/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Restaurant delete proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
 // Menu item update route
 app.put(
   '/api/restaurants/menu-items/:id',
@@ -499,6 +534,41 @@ app.put(
   })
 );
 
+// Menu item delete route
+app.delete(
+  '/api/restaurants/menu-items/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.restaurantService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/restaurants': '/restaurants',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('Menu item delete proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'Restaurant service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
 // Protected routes (require authentication)
 // User Service - Protected routes (profile, addresses)
 app.use(
@@ -581,6 +651,83 @@ app.post(
     },
     onError: (err: any, req, res) => {
       console.error('User addresses POST proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'User service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+// User addresses routes - PUT and DELETE
+app.put(
+  '/api/users/addresses/:id',
+  authenticateJWT,
+  express.json({ limit: '10mb' }),
+  createProxyMiddleware({
+    target: services.userService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/users/addresses': '/users/addresses',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+      // Write body to proxy request if it exists
+      if (req.body) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('User addresses PUT proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'User service unavailable',
+          error: err.message || err.code,
+        });
+      }
+    },
+  })
+);
+
+app.delete(
+  '/api/users/addresses/:id',
+  authenticateJWT,
+  createProxyMiddleware({
+    target: services.userService,
+    changeOrigin: true,
+    pathRewrite: {
+      '^/api/users/addresses': '/users/addresses',
+    },
+    onProxyReq: (proxyReq, req) => {
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', req.user.id.toString());
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        if (req.user.role) {
+          proxyReq.setHeader('X-User-Role', req.user.role);
+        }
+      }
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('User addresses DELETE proxy error:', err);
       if (!(res as Response).headersSent) {
         (res as Response).status(502).json({
           status: 'error',

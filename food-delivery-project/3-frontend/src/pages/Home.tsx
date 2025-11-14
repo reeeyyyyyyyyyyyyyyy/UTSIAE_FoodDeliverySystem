@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { ChefHat, MapPin } from 'lucide-react';
 import { restaurantAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
+import { AuthModal } from '../components/AuthModal';
 
 interface Restaurant {
   id: number;
@@ -18,6 +20,7 @@ export const Home: React.FC = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
@@ -65,7 +68,10 @@ export const Home: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="text-5xl md:text-6xl font-bold mb-4">🍔 Food Delivery</h1>
+            <h1 className="text-5xl md:text-6xl font-bold mb-4 flex items-center justify-center gap-3">
+              <ChefHat className="w-12 h-12 md:w-16 md:h-16" />
+              Food Delivery
+            </h1>
             <p className="text-xl md:text-2xl mb-8 text-orange-100">
               Pesan makanan favoritmu dari restoran terbaik
             </p>
@@ -73,7 +79,7 @@ export const Home: React.FC = () => {
               <div className="flex gap-4 justify-center">
                 <Button
                   variant="secondary"
-                  onClick={() => navigate('/')}
+                  onClick={() => setShowAuthModal(true)}
                   className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-3 text-lg"
                 >
                   Daftar Sekarang
@@ -112,7 +118,9 @@ export const Home: React.FC = () => {
         {/* Restaurants Grid */}
         {restaurants.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">🍽️</div>
+            <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
+              <ChefHat className="w-8 h-8 text-orange-600" />
+            </div>
             <p className="text-gray-600 text-lg">Tidak ada restoran ditemukan</p>
           </div>
         ) : (
@@ -132,7 +140,7 @@ export const Home: React.FC = () => {
                   if (isAuthenticated) {
                     navigate(`/restaurants/${restaurant.id}`);
                   } else {
-                    navigate('/');
+                    setShowAuthModal(true);
                   }
                 }}
               >
@@ -146,7 +154,7 @@ export const Home: React.FC = () => {
                   </div>
                 ) : (
                   <div className="h-48 bg-gradient-to-br from-orange-200 to-orange-300 flex items-center justify-center">
-                    <span className="text-6xl">🍽️</span>
+                    <ChefHat className="w-16 h-16 text-orange-600" />
                   </div>
                 )}
                 <div className="p-6">
@@ -165,7 +173,8 @@ export const Home: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-orange-600 font-semibold mb-2 flex items-center gap-2">
-                    <span>📍</span> {restaurant.cuisine_type}
+                    <MapPin className="w-4 h-4" />
+                    {restaurant.cuisine_type}
                   </p>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">{restaurant.address}</p>
                   <Button
@@ -177,7 +186,7 @@ export const Home: React.FC = () => {
                       if (isAuthenticated) {
                         navigate(`/restaurants/${restaurant.id}`);
                       } else {
-                        navigate('/');
+                        setShowAuthModal(true);
                       }
                     }}
                   >
@@ -189,6 +198,7 @@ export const Home: React.FC = () => {
           </motion.div>
         )}
       </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialView="register" />
     </div>
   );
 };

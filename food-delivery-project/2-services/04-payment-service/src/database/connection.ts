@@ -9,10 +9,10 @@ dotenv.config();
 // Konfigurasi pool tetap sama
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
+  port: parseInt(process.env.DB_PORT || '3308'),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'user_service_db', // Pastikan DB_NAME di .env sesuai
+  database: process.env.DB_NAME || 'payment_service_db', // Pastikan DB_NAME di .env sesuai
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

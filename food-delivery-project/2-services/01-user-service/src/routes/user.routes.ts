@@ -73,6 +73,8 @@ router.get('/addresses', authenticateToken, UserController.getAddresses);
  *         description: Unauthorized
  */
 router.post('/addresses', authenticateToken, UserController.createAddress);
+router.put('/addresses/:id', authenticateToken, UserController.updateAddress);
+router.delete('/addresses/:id', authenticateToken, UserController.deleteAddress);
 
 // Admin routes
 router.get('/admin/all', authenticateToken, authorizeAdmin, UserController.getAllUsers);

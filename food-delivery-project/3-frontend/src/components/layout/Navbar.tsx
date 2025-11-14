@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X, ShoppingBag, User, LogOut, ChefHat, Package, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
 import { AuthModal } from '../AuthModal';
 import { showConfirm, showSuccess } from '../../utils/swal';
+import { AdminSidebar } from './AdminSidebar';
 
 export const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated, isAdmin, isDriver, isCustomer } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAdminSidebar, setShowAdminSidebar] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const handleLogout = async () => {
     const result = await showConfirm(
@@ -23,7 +26,7 @@ export const Navbar: React.FC = () => {
     
     if (result.isConfirmed) {
       logout();
-      await showSuccess('Logout Berhasil! 👋', 'Sampai jumpa kembali!');
+      await showSuccess('Logout Berhasil!', 'Sampai jumpa kembali!');
       navigate('/');
     }
   };
@@ -44,188 +47,228 @@ export const Navbar: React.FC = () => {
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.5 }}
               >
-                🍔
+                <ChefHat className="w-8 h-8 text-orange-500" />
               </motion.span>
               <span className="text-2xl font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent group-hover:from-orange-600 group-hover:to-orange-700 transition-all">
                 Food Delivery
               </span>
             </Link>
 
-            {/* Navigation */}
-            <div className="flex items-center gap-4">
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center gap-4">
               {isAuthenticated ? (
                 <>
                   {isAdmin && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowAdminMenu(!showAdminMenu)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                          isActive('/admin') || isActive('/admin/restaurants') || 
-                          isActive('/admin/users') || isActive('/admin/drivers') || 
-                          isActive('/admin/salaries') || isActive('/admin/statistics') || 
-                          isActive('/admin/orders')
-                            ? 'bg-orange-500 text-white shadow-md'
-                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
-                        }`}
-                      >
-                        Admin Menu ▼
-                      </button>
-                      <AnimatePresence>
-                        {showAdminMenu && (
-                          <>
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-orange-100 py-2 z-50"
-                            >
-                              <Link
-                                to="/admin"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                📊 Dashboard
-                              </Link>
-                              <Link
-                                to="/admin/restaurants"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                🍽️ Manage Restaurants
-                              </Link>
-                              <Link
-                                to="/admin/users"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                👥 Manage Users
-                              </Link>
-                              <Link
-                                to="/admin/drivers"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                🚗 Track Drivers
-                              </Link>
-                              <Link
-                                to="/admin/salaries"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                💰 Driver Salaries
-                              </Link>
-                              <Link
-                                to="/admin/statistics"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                📈 Sales Statistics
-                              </Link>
-                              <Link
-                                to="/admin/orders"
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                                onClick={() => setShowAdminMenu(false)}
-                              >
-                                📦 Track Orders
-                              </Link>
-                            </motion.div>
-                            <div
-                              className="fixed inset-0 z-40"
-                              onClick={() => setShowAdminMenu(false)}
-                            />
-                          </>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                    <button
+                      onClick={() => setShowAdminSidebar(!showAdminSidebar)}
+                      className="px-4 py-2 rounded-lg font-medium transition-all text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                    >
+                      <Menu className="w-5 h-5" />
+                      Admin Menu
+                    </button>
                   )}
                   {isDriver && (
                     <Link
                       to="/driver"
-                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
                         isActive('/driver')
                           ? 'bg-orange-500 text-white shadow-md'
                           : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
                       }`}
                     >
-                      🚗 Driver Dashboard
+                      <Package className="w-5 h-5" />
+                      Driver Dashboard
                     </Link>
                   )}
                   {isCustomer && (
                     <>
                       <Link
                         to="/browse"
-                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
                           isActive('/browse')
                             ? 'bg-orange-500 text-white shadow-md'
                             : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
                         }`}
                       >
-                        🍽️ Restaurants
+                        <ChefHat className="w-5 h-5" />
+                        Browse
                       </Link>
                       <Link
                         to="/orders"
-                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
                           isActive('/orders')
                             ? 'bg-orange-500 text-white shadow-md'
                             : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
                         }`}
                       >
-                        📦 My Orders
+                        <Package className="w-5 h-5" />
+                        My Orders
+                      </Link>
+                      <Link
+                        to="/profile"
+                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                          isActive('/profile')
+                            ? 'bg-orange-500 text-white shadow-md'
+                            : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
+                        }`}
+                      >
+                        <User className="w-5 h-5" />
+                        Profile
                       </Link>
                     </>
                   )}
-                  <Link
-                    to="/profile"
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                      isActive('/profile')
-                        ? 'bg-orange-500 text-white shadow-md'
-                        : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
-                    }`}
-                  >
-                    👤 Profile
-                  </Link>
-                  <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-                    <span className="text-sm text-gray-600 hidden md:inline">
-                      Hello, <span className="font-semibold text-gray-900">{user?.name}</span>{' '}
-                      {isAdmin && '👑'} {isDriver && '🚗'} 👋
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
-                    >
-                      Logout
+                  <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+                    <span className="text-sm text-gray-600 hidden md:block">{user?.name || user?.email}</span>
+                    <Button variant="ghost" size="sm" onClick={handleLogout} className="flex items-center gap-2">
+                      <LogOut className="w-4 h-4" />
+                      <span className="hidden sm:inline">Logout</span>
                     </Button>
                   </div>
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAuthModal(true)}
-                    className="hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setShowAuthModal(true)}>
                     Login
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setShowAuthModal(true);
-                      // Will be handled by AuthModal's initialView
-                    }}
-                  >
+                  <Button variant="primary" size="sm" onClick={() => setShowAuthModal(true)}>
                     Register
                   </Button>
                 </>
               )}
             </div>
+
+            {/* Mobile Menu Button */}
+            <div className="lg:hidden flex items-center gap-2">
+              {isAuthenticated && (
+                <Link
+                  to="/profile"
+                  className="p-2 text-gray-700 hover:bg-orange-50 rounded-lg"
+                >
+                  <User className="w-5 h-5" />
+                </Link>
+              )}
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2 text-gray-700 hover:bg-orange-50 rounded-lg"
+              >
+                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
+
+          {/* Mobile Menu */}
+          <AnimatePresence>
+            {showMobileMenu && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="lg:hidden border-t border-gray-200 py-4 space-y-2"
+              >
+                {isAuthenticated ? (
+                  <>
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setShowAdminSidebar(true);
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left rounded-lg font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                      >
+                        <Menu className="w-5 h-5" />
+                        Admin Menu
+                      </button>
+                    )}
+                    {isDriver && (
+                      <Link
+                        to="/driver"
+                        onClick={() => setShowMobileMenu(false)}
+                        className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                      >
+                        <Package className="w-5 h-5" />
+                        Driver Dashboard
+                      </Link>
+                    )}
+                    {isCustomer && (
+                      <>
+                        <Link
+                          to="/browse"
+                          onClick={() => setShowMobileMenu(false)}
+                          className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                        >
+                          <ChefHat className="w-5 h-5" />
+                          Browse
+                        </Link>
+                        <Link
+                          to="/orders"
+                          onClick={() => setShowMobileMenu(false)}
+                          className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                        >
+                          <Package className="w-5 h-5" />
+                          My Orders
+                        </Link>
+                        <Link
+                          to="/profile"
+                          onClick={() => setShowMobileMenu(false)}
+                          className="block px-4 py-2 rounded-lg font-medium text-gray-700 hover:bg-orange-50 hover:text-orange-600 flex items-center gap-2"
+                        >
+                          <User className="w-5 h-5" />
+                          Profile
+                        </Link>
+                      </>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left rounded-lg font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 flex items-center gap-2"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowAuthModal(true);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full justify-start"
+                    >
+                      Login
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setShowAuthModal(true);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full"
+                    >
+                      Register
+                    </Button>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </nav>
 
+      {/* Admin Sidebar - Always visible on desktop, toggle on mobile */}
+      {isAdmin && (
+        <AdminSidebar
+          isOpen={showAdminSidebar || window.innerWidth >= 1024}
+          onClose={() => setShowAdminSidebar(false)}
+        />
+      )}
+
+      {/* Auth Modal */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}

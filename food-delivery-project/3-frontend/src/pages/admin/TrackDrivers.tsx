@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Truck, Package, DollarSign, CheckCircle, XCircle, Clock, User, Phone, Car, MapPin, Calendar } from 'lucide-react';
 import { driverAPI } from '../../services/api';
 import { formatRupiah } from '../../utils/format';
-import { Button } from '../../components/ui/Button';
+import { showError } from '../../utils/swal';
 
 interface ActiveOrder {
   order_id: number;
@@ -31,11 +32,9 @@ interface Driver {
 export const TrackDrivers: React.FC = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchDrivers();
-    // Auto-refresh every 5 seconds to get real-time updates
     const interval = setInterval(fetchDrivers, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -43,106 +42,209 @@ export const TrackDrivers: React.FC = () => {
   const fetchDrivers = async () => {
     try {
       setIsLoading(true);
-      setError('');
       const response = await driverAPI.getAllDrivers();
       if (response.status === 'success') {
         setDrivers(response.data || []);
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to fetch drivers');
       console.error('Failed to fetch drivers:', error);
+      await showError('Gagal Memuat Data', error.response?.data?.message || 'Terjadi kesalahan');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+          <p className="text-gray-600">Memuat data driver...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Track Drivers</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50">
+      <div className="w-full lg:pl-64">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Track Drivers</h1>
+          <p className="text-gray-600">Pantau status dan aktivitas semua driver (Real-time SOA)</p>
+        </motion.div>
 
-      {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded mb-4" onClick={() => setError('')}>
-          {error} (Click to dismiss)
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="text-center py-8">
-          <p className="text-gray-600">Loading drivers...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {drivers.map((driver, index) => (
-            <motion.div
-              key={driver.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white p-6 rounded-lg shadow-md"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">{driver.name}</h3>
-                </div>
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    driver.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {driver.is_available ? 'Available' : 'Busy'}
-                </span>
-              </div>
-              <div className="space-y-2 text-sm">
-                <p>
-                  <span className="font-medium text-gray-600">Phone:</span> {driver.phone || '-'}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-600">License:</span> {driver.license_number}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-600">Vehicle:</span> {driver.vehicle_type}
-                </p>
-                <p>
-                  <span className="font-medium text-gray-600">Active Jobs:</span>{' '}
-                  <span className={`font-semibold ${driver.active_orders > 0 ? 'text-orange-600' : 'text-gray-600'}`}>
-                    {driver.active_orders}
-                  </span>
-                </p>
-                {driver.active_orders > 0 && driver.active_orders_details && driver.active_orders_details.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="font-medium text-gray-700 mb-2">Current Jobs:</p>
-                    {driver.active_orders_details.map((order) => (
-                      <div key={order.order_id} className="mb-2 p-2 bg-orange-50 rounded text-xs">
-                        <p className="font-medium text-gray-800">Order #{order.order_id}</p>
-                        <p className="text-gray-600">Restaurant: {order.restaurant_name}</p>
-                        <p className="text-gray-600">Customer: {order.customer_name}</p>
-                        <p className="text-gray-600">Status: <span className="font-semibold">{order.status}</span></p>
-                        <p className="text-gray-600">Total: {formatRupiah(order.total_price || 0)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p>
-                  <span className="font-medium text-gray-600">Total Earnings:</span>{' '}
-                  <span className="font-semibold text-green-600">
-                    {formatRupiah(driver.total_earnings || 0)}
-                  </span>
-                </p>
-                <p>
-                  <span className="font-medium text-gray-600">Joined:</span>{' '}
-                  {new Date(driver.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-
-          {drivers.length === 0 && (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-600">No drivers found</p>
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-blue-100 text-sm font-medium">Total Drivers</span>
+              <Truck className="w-6 h-6" />
             </div>
-          )}
+            <p className="text-3xl font-bold">{drivers.length}</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-green-100 text-sm font-medium">Available</span>
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <p className="text-3xl font-bold">{drivers.filter(d => d.is_available && !d.is_on_job).length}</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-orange-100 text-sm font-medium">On Job</span>
+              <Package className="w-6 h-6" />
+            </div>
+            <p className="text-3xl font-bold">{drivers.filter(d => d.is_on_job || d.active_orders > 0).length}</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-purple-100 text-sm font-medium">Total Earnings</span>
+              <DollarSign className="w-6 h-6" />
+            </div>
+            <p className="text-xl font-bold">{formatRupiah(drivers.reduce((sum, d) => sum + (d.total_earnings || 0), 0))}</p>
+          </motion.div>
         </div>
-      )}
+
+        {/* Drivers Grid */}
+        {drivers.length === 0 ? (
+          <div className="text-center py-16 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg">
+            <Truck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">Tidak ada driver ditemukan</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {drivers.map((driver, index) => {
+              const isAvailable = driver.is_available && !driver.is_on_job && driver.active_orders === 0;
+              const isOnJob = driver.is_on_job || driver.active_orders > 0;
+              
+              return (
+                <motion.div
+                  key={driver.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6 hover:shadow-xl transition-all"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        isAvailable ? 'bg-green-100' : isOnJob ? 'bg-orange-100' : 'bg-gray-100'
+                      }`}>
+                        <Truck className={`w-6 h-6 ${
+                          isAvailable ? 'text-green-600' : isOnJob ? 'text-orange-600' : 'text-gray-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">{driver.name}</h3>
+                        <p className="text-sm text-gray-500">ID: {driver.id}</p>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                        isAvailable
+                          ? 'bg-green-100 text-green-800'
+                          : isOnJob
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {isAvailable ? (
+                        <>
+                          <CheckCircle className="w-3 h-3" />
+                          Available
+                        </>
+                      ) : isOnJob ? (
+                        <>
+                          <Clock className="w-3 h-3" />
+                          On Job
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-3 h-3" />
+                          Busy
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span>{driver.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Car className="w-4 h-4 text-gray-400" />
+                      <span>{driver.vehicle_type} - {driver.license_number}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Package className="w-4 h-4 text-gray-400" />
+                      <span>Active Orders: {driver.active_orders || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                      <span className="font-semibold text-green-600">{formatRupiah(driver.total_earnings || 0)}</span>
+                    </div>
+                  </div>
+
+                  {driver.active_orders_details && driver.active_orders_details.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">Active Orders:</p>
+                      <div className="space-y-2">
+                        {driver.active_orders_details.map((order) => (
+                          <div key={order.order_id} className="p-2 bg-orange-50 rounded-lg text-xs">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-gray-900">Order #{order.order_id}</span>
+                              <span className="text-orange-600 font-semibold">{formatRupiah(order.total_price || 0)}</span>
+                            </div>
+                            <p className="text-gray-600">{order.restaurant_name}</p>
+                            <p className="text-gray-600">Customer: {order.customer_name}</p>
+                            <p className="text-gray-500 mt-1">Status: {order.status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Calendar className="w-3 h-3" />
+                      <span>Bergabung: {new Date(driver.created_at).toLocaleDateString('id-ID')}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+        </div>
+      </div>
     </div>
   );
 };
-

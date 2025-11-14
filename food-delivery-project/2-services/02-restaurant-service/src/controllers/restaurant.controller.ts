@@ -517,5 +517,97 @@ export class RestaurantController {
       });
     }
   }
+
+  static async deleteRestaurant(req: Request, res: Response): Promise<void> {
+    try {
+      const restaurantId = parseInt(req.params.id);
+
+      if (!restaurantId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Restaurant ID is required',
+        });
+        return;
+      }
+
+      // Check if restaurant exists
+      const restaurant = await RestaurantModel.findById(restaurantId);
+      if (!restaurant) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Restaurant not found',
+        });
+        return;
+      }
+
+      // Delete restaurant (cascade will delete menu items)
+      const deleted = await RestaurantModel.delete(restaurantId);
+
+      if (deleted) {
+        res.json({
+          status: 'success',
+          message: 'Restaurant deleted successfully',
+        });
+      } else {
+        res.status(500).json({
+          status: 'error',
+          message: 'Failed to delete restaurant',
+        });
+      }
+    } catch (error: any) {
+      console.error('Delete restaurant error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
+
+  static async deleteMenuItem(req: Request, res: Response): Promise<void> {
+    try {
+      const menuItemId = parseInt(req.params.id);
+
+      if (!menuItemId) {
+        res.status(400).json({
+          status: 'error',
+          message: 'Menu item ID is required',
+        });
+        return;
+      }
+
+      // Check if menu item exists
+      const menuItem = await MenuItemModel.findById(menuItemId);
+      if (!menuItem) {
+        res.status(404).json({
+          status: 'error',
+          message: 'Menu item not found',
+        });
+        return;
+      }
+
+      // Delete menu item
+      const deleted = await MenuItemModel.delete(menuItemId);
+
+      if (deleted) {
+        res.json({
+          status: 'success',
+          message: 'Menu item deleted successfully',
+        });
+      } else {
+        res.status(500).json({
+          status: 'error',
+          message: 'Failed to delete menu item',
+        });
+      }
+    } catch (error: any) {
+      console.error('Delete menu item error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  }
 }
 

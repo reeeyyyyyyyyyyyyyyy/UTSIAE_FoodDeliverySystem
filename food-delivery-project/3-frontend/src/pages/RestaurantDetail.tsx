@@ -34,11 +34,11 @@ export const RestaurantDetail: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isLoading, setIsLoading] = useState(true);
   const [isOrdering, setIsOrdering] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -50,12 +50,28 @@ export const RestaurantDetail: React.FC = () => {
       try {
         const menuResponse = await restaurantAPI.getRestaurantMenu(parseInt(id!));
         if (menuResponse.status === 'success') {
-          setRestaurantName(menuResponse.data.restaurant_name);
-          // Remove duplicates by id
-          const uniqueMenuItems = (menuResponse.data.menu_items || []).filter((item: MenuItem, index: number, self: MenuItem[]) => 
-            index === self.findIndex((m) => m.id === item.id)
-          );
+          setRestaurantName(menuResponse.data.restaurant_name || 'Restaurant');
+          // Remove duplicates by id and ensure all required fields
+          const rawItems = menuResponse.data.menu_items || [];
+          const uniqueMenuItems = rawItems
+            .filter((item: any, index: number, self: any[]) => 
+              index === self.findIndex((m) => m.id === item.id)
+            )
+            .map((item: any) => ({
+              id: item.id,
+              name: item.name || 'Unknown Item',
+              description: item.description || '',
+              price: parseFloat(item.price) || 0,
+              stock: parseInt(item.stock) || 0,
+              is_available: item.is_available !== false,
+              category: item.category || 'Makanan',
+              image_url: item.image_url || undefined,
+            }));
+          console.log('Menu items loaded:', uniqueMenuItems.length, uniqueMenuItems);
           setMenuItems(uniqueMenuItems);
+        } else {
+          console.error('Failed to fetch menu:', menuResponse);
+          setError('Failed to load menu items');
         }
 
         const addressesResponse = await userAPI.getAddresses();
@@ -254,7 +270,12 @@ export const RestaurantDetail: React.FC = () => {
 
             {menuItems.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-600">No menu items available</p>
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🍽️</span>
+                </div>
+                <p className="text-gray-600 text-lg mb-2">No menu items available</p>
+                <p className="text-gray-400 text-sm">This restaurant hasn't added any menu items yet.</p>
+                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
             ) : (
               <div className="space-y-4">
