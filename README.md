@@ -272,13 +272,13 @@ Gunakan script helper untuk start/stop semua services:
 
 ```bash
 # Start all services
-./docs/scripts/start-all.sh
+./start-all.sh
 
 # Stop all services
-./docs/scripts/stop-all.sh
+./stop-all.sh
 
 # Migrate fresh (clean & reinitialize databases)
-./docs/scripts/migrate-fresh.sh
+./migrate-fresh.sh
 ```
 
 ---
