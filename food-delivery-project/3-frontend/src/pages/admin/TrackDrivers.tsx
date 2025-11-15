@@ -74,7 +74,10 @@ export const TrackDrivers: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Track Drivers</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <Truck className="w-10 h-10 text-orange-600" />
+            Track Drivers
+          </h1>
           <p className="text-gray-600">Pantau status dan aktivitas semua driver (Real-time SOA)</p>
         </motion.div>
 

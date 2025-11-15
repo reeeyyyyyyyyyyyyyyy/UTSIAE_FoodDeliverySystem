@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Package, DollarSign, CheckCircle, Clock, TrendingUp, BarChart3, Truck, Wallet, ArrowRight } from 'lucide-react';
+import { LayoutDashboard, Package, DollarSign, CheckCircle, Clock, TrendingUp, BarChart3, Truck, Wallet, ArrowRight } from 'lucide-react';
 import { orderAPI } from '../services/api';
 import { formatRupiah } from '../utils/format';
 
@@ -62,7 +62,11 @@ export const AdminDashboard: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <LayoutDashboard className="w-10 h-10 text-orange-600" />
+            Admin Dashboard
+          </h1>
           <p className="text-gray-600">Analitik dan ringkasan penjualan sistem</p>
         </motion.div>
 

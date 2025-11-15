@@ -127,7 +127,10 @@ export const DriverSalaries: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Driver Salaries</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <Wallet className="w-10 h-10 text-orange-600" />
+            Driver Salaries
+          </h1>
           <p className="text-gray-600">Kelola gaji driver (Real-time SOA data)</p>
         </motion.div>
 

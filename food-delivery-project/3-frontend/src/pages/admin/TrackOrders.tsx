@@ -113,7 +113,10 @@ export const TrackOrders: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Track Orders</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <Package className="w-10 h-10 text-orange-600" />
+            Track Orders
+          </h1>
           <p className="text-gray-600">Pantau semua pesanan dalam sistem (Real-time SOA)</p>
         </motion.div>
 

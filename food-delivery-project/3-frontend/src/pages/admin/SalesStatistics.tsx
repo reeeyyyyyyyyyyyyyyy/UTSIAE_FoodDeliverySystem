@@ -76,7 +76,10 @@ export const SalesStatistics: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Sales Statistics</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <BarChart3 className="w-10 h-10 text-orange-600" />
+            Sales Statistics
+          </h1>
           <p className="text-gray-600">Analitik penjualan dan performa restoran (Real-time SOA)</p>
         </motion.div>
 
