@@ -1,13 +1,12 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { OrderModel, OrderInput, OrderItem } from '../models/order.model';
+import { OrderModel, OrderInput } from '../models/order.model';
 
 dotenv.config();
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 const RESTAURANT_SERVICE_URL = process.env.RESTAURANT_SERVICE_URL || 'http://localhost:3002';
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004';
-const DRIVER_SERVICE_URL = process.env.DRIVER_SERVICE_URL || 'http://localhost:3005';
 
 export class OrderService {
   static async validateUser(userId: number): Promise<any> {
@@ -129,7 +128,7 @@ export class OrderService {
     }
 
     // Step 2: Validate restaurant and menu, check stock
-    const { restaurant, menuItems } = await this.validateRestaurantAndMenu(orderData.restaurant_id, orderData.items);
+    const { menuItems } = await this.validateRestaurantAndMenu(orderData.restaurant_id, orderData.items);
 
     // Step 3: Calculate total price (subtotal + tax + delivery fee)
     let subtotal = 0;

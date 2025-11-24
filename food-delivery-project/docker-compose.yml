@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MySQL Databases
   mysql-user:
@@ -32,7 +30,7 @@ services:
       MYSQL_USER: restaurant_service
       MYSQL_PASSWORD: restaurant_service_pass
     ports:
-      - "3308:3306"
+      - "13308:3306"
     volumes:
       - mysql-restaurant-data:/var/lib/mysql
       - ./2-services/02-restaurant-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -53,7 +51,7 @@ services:
       MYSQL_USER: order_service
       MYSQL_PASSWORD: order_service_pass
     ports:
-      - "3309:3306"
+      - "13309:3306"
     volumes:
       - mysql-order-data:/var/lib/mysql
       - ./2-services/03-order-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -74,7 +72,7 @@ services:
       MYSQL_USER: payment_service
       MYSQL_PASSWORD: payment_service_pass
     ports:
-      - "3310:3306"
+      - "13310:3306"
     volumes:
       - mysql-payment-data:/var/lib/mysql
       - ./2-services/04-payment-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -95,7 +93,7 @@ services:
       MYSQL_USER: driver_service
       MYSQL_PASSWORD: driver_service_pass
     ports:
-      - "3311:3306"
+      - "13311:3306"
     volumes:
       - mysql-driver-data:/var/lib/mysql
       - ./2-services/05-driver-service/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -124,7 +122,7 @@ services:
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
       JWT_EXPIRES_IN: 24h
     ports:
-      - "3001:3001"
+      - "13307:3306"
     depends_on:
       mysql-user:
         condition: service_healthy
@@ -182,8 +180,6 @@ services:
         condition: service_started
       restaurant-service:
         condition: service_started
-      payment-service:
-        condition: service_started
     networks:
       - food-delivery-network
     restart: unless-stopped
@@ -208,8 +204,6 @@ services:
     depends_on:
       mysql-payment:
         condition: service_healthy
-      order-service:
-        condition: service_started
     networks:
       - food-delivery-network
     restart: unless-stopped
@@ -234,8 +228,6 @@ services:
     depends_on:
       mysql-driver:
         condition: service_healthy
-      order-service:
-        condition: service_started
     networks:
       - food-delivery-network
     restart: unless-stopped
@@ -275,7 +267,7 @@ services:
       dockerfile: Dockerfile
     container_name: frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - api-gateway
     networks:

@@ -12,6 +12,11 @@ export const RoleRedirect: React.FC<{ children: React.ReactNode }> = ({ children
 
     const currentPath = location.pathname;
     
+    // Don't redirect from login/register pages (let them handle their own redirects)
+    if (currentPath === '/login' || currentPath === '/register') {
+      return;
+    }
+    
     // Don't redirect if on profile, orders, browse, restaurant detail, payment, invoice pages
     if (currentPath === '/profile' || 
         currentPath.startsWith('/orders') || 

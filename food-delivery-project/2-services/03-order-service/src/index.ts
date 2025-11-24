@@ -11,18 +11,27 @@ dotenv.config();
 
 const app: Express = express();
 
+// Normalize Content-Type charset for JSON bodies
+app.use((req: Request, _res: Response, next) => {
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.toLowerCase().includes('charset')) {
+    req.headers['content-type'] = contentType.replace(/charset="?utf-8"?/gi, 'charset=utf-8');
+  }
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health Check
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', service: 'Order Service' });
 });
 
 // Root endpoint
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.status(200).json({ 
     status: 'success',
     message: 'Order Service is running',

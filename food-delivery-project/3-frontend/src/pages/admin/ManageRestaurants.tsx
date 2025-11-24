@@ -96,8 +96,8 @@ export const ManageRestaurants: React.FC = () => {
     try {
       const response = await restaurantAPI.getRestaurantMenu(restaurantId);
       if (response.status === 'success') {
-        const items = response.data.menu_items || [];
-        const uniqueItems = Array.from(new Map(items.map(item => [item.id, item])).values());
+        const items: MenuItem[] = response.data.menu_items || [];
+        const uniqueItems: MenuItem[] = Array.from(new Map(items.map((item) => [item.id, item])).values());
         setMenuItems(uniqueItems);
       }
     } catch (error) {

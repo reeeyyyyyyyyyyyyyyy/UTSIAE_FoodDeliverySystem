@@ -4,7 +4,7 @@
   "description": "Order Service for Food Delivery System",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node ./node_modules/typescript/lib/tsc.js",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "lint": "eslint src/**/*.ts",

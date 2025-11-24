@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { createProxyMiddleware, Options } from 'http-proxy-middleware';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
@@ -12,6 +12,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Middleware
 app.use(cors());
+
+// Normalize Content-Type charset to prevent body-parser errors with quoted/upper-case values
+app.use((req, _res, next) => {
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.toLowerCase().includes('charset')) {
+    const sanitized = contentType.replace(/charset="?utf-8"?/gi, 'charset=utf-8');
+    req.headers['content-type'] = sanitized;
+  }
+  next();
+});
 
 // Request logging middleware (but skip for proxy routes to avoid double logging)
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -72,50 +82,12 @@ const authenticateJWT = (req: Request, res: Response, next: NextFunction): void 
   }
 };
 
-// Proxy middleware with JWT forwarding
-const createAuthProxy = (serviceUrl: string, serviceName: string) => {
-  return createProxyMiddleware({
-    target: serviceUrl,
-    changeOrigin: true,
-    timeout: 30000,
-    proxyTimeout: 30000,
-    pathRewrite: {
-      [`^/api/${serviceName}`]: '',
-    },
-    onProxyReq: (proxyReq, req) => {
-      // Forward JWT token to backend services
-      if (req.user) {
-        proxyReq.setHeader('X-User-Id', req.user.id.toString());
-        proxyReq.setHeader('X-User-Email', req.user.email);
-        if (req.user.role) {
-          proxyReq.setHeader('X-User-Role', req.user.role);
-        }
-      }
-      // Forward original authorization header
-      if (req.headers.authorization) {
-        proxyReq.setHeader('Authorization', req.headers.authorization);
-      }
-    },
-    onError: (err: any, req, res) => {
-      console.error(`Proxy error for ${serviceName}:`, err);
-      if (err.code === 'ECONNRESET' || err.message?.includes('socket hang up')) {
-        console.warn(`⚠️ Connection reset for ${serviceName}, ignoring...`);
-        return;
-      }
-      if (!(res as Response).headersSent) {
-      (res as Response).status(500).json({
-        error: 'Service unavailable',
-        message: `Failed to connect to ${serviceName}`,
-      });
-      }
-    },
-  });
-};
-
 // Public routes (no authentication required)
 // User Service - Auth routes (register, login) - MUST BE FIRST AND MOST SPECIFIC
 // IMPORTANT: NO body parser middleware before these routes to avoid consuming request stream
-app.use(
+
+// Login route - POST only
+app.post(
   '/api/users/auth/login',
   express.json({ limit: '10mb' }), // Parse JSON body for login
   createProxyMiddleware({
@@ -166,8 +138,29 @@ app.use(
   })
 );
 
-// Register route - Parse JSON body before proxy
-app.use(
+// Handle GET request to login endpoint (wrong method)
+app.get('/api/users/auth/login', (req: Request, res: Response) => {
+  res.status(405).json({
+    status: 'error',
+    message: 'Method not allowed. Login endpoint requires POST method.',
+    endpoint: '/api/users/auth/login',
+    method: 'POST',
+    example: {
+      url: '/api/users/auth/login',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: {
+        email: 'user@example.com',
+        password: 'password123'
+      }
+    }
+  });
+});
+
+// Register route - POST only
+app.post(
   '/api/users/auth/register',
   express.json({ limit: '10mb' }), // Parse JSON body for register
   createProxyMiddleware({
@@ -216,6 +209,30 @@ app.use(
     },
   })
 );
+
+// Handle GET request to register endpoint (wrong method)
+app.get('/api/users/auth/register', (req: Request, res: Response) => {
+  res.status(405).json({
+    status: 'error',
+    message: 'Method not allowed. Register endpoint requires POST method.',
+    endpoint: '/api/users/auth/register',
+    method: 'POST',
+    example: {
+      url: '/api/users/auth/register',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: {
+        name: 'John Doe',
+        email: 'user@example.com',
+        password: 'password123',
+        phone: '081234567890',
+        role: 'customer'
+      }
+    }
+  });
+});
 
 // Body parser for non-proxy routes (after proxy routes) - only for non-multipart
 // This is for routes that don't use proxy middleware
@@ -571,14 +588,14 @@ app.delete(
 
 // Protected routes (require authentication)
 // User Service - Protected routes (profile, addresses)
-app.use(
+app.get(
   '/api/users/profile',
   authenticateJWT,
   createProxyMiddleware({
     target: services.userService,
     changeOrigin: true,
     pathRewrite: {
-      '^/api/users/profile': '/users/profile',
+      '^/api/users/profile': '/users/profile/me',
     },
     onProxyReq: (proxyReq, req) => {
       if (req.user) {
@@ -590,6 +607,16 @@ app.use(
       }
       if (req.headers.authorization) {
         proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+    },
+    onError: (err: any, req, res) => {
+      console.error('User profile proxy error:', err);
+      if (!(res as Response).headersSent) {
+        (res as Response).status(502).json({
+          status: 'error',
+          message: 'User service unavailable',
+          error: err.message || err.code,
+        });
       }
     },
   })

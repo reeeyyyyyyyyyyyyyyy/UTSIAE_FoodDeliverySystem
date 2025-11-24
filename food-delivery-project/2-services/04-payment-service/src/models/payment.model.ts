@@ -25,7 +25,11 @@ export class PaymentModel {
       [paymentData.order_id, paymentData.user_id, paymentData.amount, 'PENDING', paymentData.payment_method || null]
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId);
+    const createdPayment = await this.findById(insertId);
+    if (!createdPayment) {
+      throw new Error('Failed to load newly created payment');
+    }
+    return createdPayment;
   }
 
   static async findById(id: number): Promise<Payment | null> {

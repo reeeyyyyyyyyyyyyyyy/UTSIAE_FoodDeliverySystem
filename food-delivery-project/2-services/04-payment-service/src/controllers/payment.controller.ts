@@ -28,7 +28,7 @@ export class PaymentController {
         return;
       }
 
-      const { order_id, payment_id, payment_method } = req.body;
+      const { order_id, payment_id } = req.body;
 
       if (!order_id || !payment_id) {
         res.status(400).json({

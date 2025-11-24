@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const normalizeRole = (role?: string) => (role ? role.toLowerCase() : undefined);
 
 interface JwtPayload {
   id: number;
@@ -69,7 +70,7 @@ export const authorizeAdmin = (req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  if (req.user.role !== 'admin') {
+  if (normalizeRole(req.user.role) !== 'admin') {
     res.status(403).json({
       status: 'error',
       message: 'Access denied. Admin role required.',

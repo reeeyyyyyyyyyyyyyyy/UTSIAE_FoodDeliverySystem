@@ -72,7 +72,11 @@ export class DriverSalaryModel {
       [salaryData.driver_id, salaryData.month, salaryData.year, salaryData.base_salary, salaryData.commission, salaryData.total_orders, salaryData.total_earnings, 'PENDING']
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId);
+    const createdSalary = await this.findById(insertId);
+    if (!createdSalary) {
+      throw new Error('Failed to load newly created driver salary');
+    }
+    return createdSalary;
   }
 
   static async findById(id: number): Promise<DriverSalary | null> {

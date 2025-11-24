@@ -13,8 +13,9 @@ export class UserController {
   static async getProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
       const userId = req.user?.id;
+      const userEmail = req.user?.email;
 
-      if (!userId) {
+      if (!userId && !userEmail) {
         res.status(401).json({
           status: 'error',
           message: 'Unauthorized',
@@ -22,7 +23,12 @@ export class UserController {
         return;
       }
 
-      const user = await UserModel.findById(userId);
+      let user = userId ? await UserModel.findById(userId) : null;
+
+      if (!user && userEmail) {
+        user = await UserModel.findByEmail(userEmail);
+      }
+
       if (!user) {
         res.status(404).json({
           status: 'error',

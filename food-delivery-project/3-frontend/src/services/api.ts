@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 3000, // 3 seconds timeout for faster testing
+  timeout: 15000, // allow slower local services before timing out
   headers: {
     'Content-Type': 'application/json',
   },
@@ -42,10 +42,10 @@ api.interceptors.response.use(
     // Handle HTTP errors
     if (error.response?.status === 401) {
       // Token expired or invalid - only redirect if not already on login/register page
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+      if (!window.location.pathname.includes('/register')) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        window.location.href = '/';
       }
     }
     

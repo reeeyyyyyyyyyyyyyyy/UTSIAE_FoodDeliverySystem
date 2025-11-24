@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Package, CheckCircle, ChefHat, Truck, MapPin, Clock, User, Phone, Car, FileText } from 'lucide-react';
+import { ArrowLeft, Package, CheckCircle, ChefHat, Truck, MapPin, Clock, User, Phone, Car, FileText, XCircle } from 'lucide-react';
 import { orderAPI } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { formatRupiah } from '../utils/format';
@@ -18,10 +18,13 @@ interface OrderStatus {
   driver_details: {
     name: string;
     phone: string;
-    vehicle: string;
+    vehicle?: string;
+    vehicle_type?: string;
+    vehicle_number?: string;
   } | null;
   items: Array<{
-    name: string;
+    menu_item_name?: string;
+    name?: string;
     quantity: number;
     price: number;
   }>;
@@ -270,7 +273,11 @@ export const OrderStatus: React.FC = () => {
                       <p className="text-xs text-gray-500 mb-1">Kendaraan</p>
                       <p className="text-gray-900 font-medium flex items-center gap-2">
                         <Car className="w-4 h-4 text-gray-400" />
-                        {order.driver_details.vehicle || `${order.driver_details.vehicle_type || ''} - ${order.driver_details.vehicle_number || ''}`}
+                        {order.driver_details.vehicle ||
+                          [order.driver_details.vehicle_type, order.driver_details.vehicle_number]
+                            .filter(Boolean)
+                            .join(' - ') ||
+                          '-'}
                       </p>
                     </div>
                   </div>
@@ -308,7 +315,7 @@ export const OrderStatus: React.FC = () => {
                     className="flex justify-between items-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{item.name}</p>
+                      <p className="font-semibold text-gray-900">{item.menu_item_name || item.name}</p>
                       <p className="text-sm text-gray-600 mt-1">Jumlah: {item.quantity}</p>
                     </div>
                     <p className="text-gray-900 font-bold">

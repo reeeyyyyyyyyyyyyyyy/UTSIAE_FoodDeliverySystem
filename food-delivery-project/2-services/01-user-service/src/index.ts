@@ -12,6 +12,15 @@ dotenv.config();
 
 const app: Express = express();
 
+// Normalize Content-Type charset to avoid body-parser errors with quoted uppercase UTF-8
+app.use((req: Request, _res: Response, next) => {
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.toLowerCase().includes('charset')) {
+    req.headers['content-type'] = contentType.replace(/charset="?utf-8"?/gi, 'charset=utf-8');
+  }
+  next();
+});
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -23,7 +32,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Root endpoint
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     message: 'User Service API',
     version: '1.0.0',
@@ -37,7 +46,7 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Health Check
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', service: 'User Service' });
 });
 

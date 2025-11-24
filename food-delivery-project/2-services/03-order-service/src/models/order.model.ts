@@ -62,7 +62,11 @@ export class OrderModel {
       }
 
       await connection.commit();
-      return this.findById(orderId);
+      const createdOrder = await this.findById(orderId);
+      if (!createdOrder) {
+        throw new Error('Failed to load newly created order');
+      }
+      return createdOrder;
     } catch (error) {
       await connection.rollback();
       throw error;

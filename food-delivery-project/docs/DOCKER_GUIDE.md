@@ -279,7 +279,7 @@ docker-compose up --build <service-name>
 
 # Check status
 docker-compose ps
-
+ 
 # Clean up
 docker-compose down -v
 ```

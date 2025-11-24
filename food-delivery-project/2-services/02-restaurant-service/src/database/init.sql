@@ -39,9 +39,11 @@ CREATE TABLE IF NOT EXISTS menu_items (
     UNIQUE KEY unique_restaurant_menu (restaurant_id, name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert sample data (clean duplicates first)
-DELETE FROM menu_items;
-DELETE FROM restaurants;
+-- Clean tables and reset auto increment so seeded IDs stay stable
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE menu_items;
+TRUNCATE TABLE restaurants;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- Insert restaurants with images
 INSERT INTO restaurants (name, cuisine_type, address, is_open, image_url) VALUES

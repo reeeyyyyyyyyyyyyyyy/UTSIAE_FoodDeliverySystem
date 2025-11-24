@@ -19,31 +19,32 @@ import { SalesStatistics } from './pages/admin/SalesStatistics';
 import { TrackOrders } from './pages/admin/TrackOrders';
 import { Payment } from './pages/Payment';
 import { Invoice } from './pages/Invoice';
+import { Register } from './pages/Register';
 import { RoleRedirect } from './middleware/RoleRedirect';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isAdmin } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!isAdmin) return <Navigate to="/" />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
 const DriverRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isDriver } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!isDriver) return <Navigate to="/" />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (!isDriver) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
 const CustomerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isCustomer } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!isCustomer) return <Navigate to="/" />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (!isCustomer) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -61,6 +62,15 @@ const AppRoutes: React.FC = () => {
         element={
           <PublicRoute>
             <Welcome />
+          </PublicRoute>
+        }
+      />
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route
+        path="/register"
+        element={
+          <PublicRoute>
+            <Register />
           </PublicRoute>
         }
       />

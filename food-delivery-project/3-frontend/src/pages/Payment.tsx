@@ -7,7 +7,8 @@ import { Button } from '../components/ui/Button';
 import { formatRupiah } from '../utils/format';
 
 interface OrderItem {
-  menu_item_name: string;
+  menu_item_name?: string;
+  name?: string;
   quantity: number;
   price: number;
 }

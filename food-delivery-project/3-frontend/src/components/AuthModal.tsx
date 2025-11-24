@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { showSuccess, showError } from '../utils/swal';
-import toast from 'react-hot-toast';
 
 interface AuthModalProps {
   isOpen: boolean;

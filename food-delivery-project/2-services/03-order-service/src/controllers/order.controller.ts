@@ -254,7 +254,7 @@ export class OrderController {
   }
 
   // Driver endpoints
-  static async getAvailableOrders(req: AuthRequest, res: Response): Promise<void> {
+  static async getAvailableOrders(_req: AuthRequest, res: Response): Promise<void> {
     try {
       // Get orders with status PREPARING (ready for driver pickup)
       const orders = await OrderModel.findByStatus('PREPARING');
@@ -871,7 +871,7 @@ export class OrderController {
     }
   }
 
-  static async getDashboardStats(req: AuthRequest, res: Response): Promise<void> {
+  static async getDashboardStats(_req: AuthRequest, res: Response): Promise<void> {
     try {
       const totalRevenue = await OrderModel.getTotalRevenue();
       const totalOrders = await OrderModel.getTotalOrders();

@@ -45,7 +45,11 @@ export class UserModel {
       [userData.name, userData.email, userData.password, userData.phone || null, 'customer']
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId);
+    const createdUser = await this.findById(insertId);
+    if (!createdUser) {
+      throw new Error('Failed to load newly created user');
+    }
+    return createdUser;
   }
 
   static async findById(id: number): Promise<User | null> {
@@ -126,7 +130,11 @@ export class AddressModel {
       ]
     );
     const insertId = (result as any).insertId;
-    return this.findById(insertId);
+    const createdAddress = await this.findById(insertId);
+    if (!createdAddress) {
+      throw new Error('Failed to load newly created address');
+    }
+    return createdAddress;
   }
 
   static async findById(id: number): Promise<Address | null> {
