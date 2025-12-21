@@ -1,26 +1,81 @@
+# ====== NODE.JS & NPM ======
 node_modules/
-dist/
-build/
-*.log
+package-lock.json
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ====== ENVIRONMENT VARIABLES ======
 .env
 .env.local
-.DS_Store
-*.db
-*.sqlite
+.env.*.local
+
+# ====== IDE & EDITORS ======
 .vscode/
 .idea/
-coverage/
 *.swp
 *.swo
 *~
+.DS_Store
+.project
+.classpath
+*.sublime-project
+*.sublime-workspace
 
-# Docker
+# ====== BUILD & COMPILED OUTPUT ======
+dist/
+build/
+*.tsbuildinfo
+.next/
+out/
+
+# ====== TYPESCRIPT ======
+*.js
+!**/*.config.js
+!**/*.setup.js
+
+# ====== DOCKER ======
 .dockerignore
 
-# Logs
-logs
+# ====== LOGS ======
+logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+lerna-debug.log*
 
+# ====== OS FILES ======
+Thumbs.db
+.DS_Store
+._*
+
+# ====== TESTING ======
+.coverage/
+.nyc_output/
+coverage/
+*.lcov
+.jest-cache/
+
+# ====== MISC ======
+.turbo/
+dist/
+*.pem
+.cache/
+temp/
+tmp/
+
+# ====== DATABASE (LOCAL) ======
+*.sqlite
+*.db
+mysql_data/
+
+# ====== UPLOADS ======
+uploads/
+public/uploads/
+
+# ====== YARN ======
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# ====== PNPM ======
+pnpm-lock.yaml
