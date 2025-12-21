@@ -1,0 +1,83 @@
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const normalizeRole = (role?: string) => (role ? role.toLowerCase() : undefined);
+
+interface JwtPayload {
+  id: number;
+  email: string;
+  role?: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JwtPayload;
+    }
+  }
+}
+
+export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  // Also check X-User-Id header (from API Gateway)
+  const userId = req.headers['x-user-id'];
+  const userEmail = req.headers['x-user-email'] as string;
+  const userRole = req.headers['x-user-role'] as string;
+
+  if (userId && userEmail) {
+    // Request comes from API Gateway with user info
+    req.user = {
+      id: parseInt(userId as string),
+      email: userEmail,
+      role: userRole,
+    };
+    next();
+    return;
+  }
+
+  if (!token) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Access denied. No token provided.',
+    });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(403).json({
+      status: 'error',
+      message: 'Invalid or expired token.',
+    });
+  }
+};
+
+export const authorizeAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized',
+    });
+    return;
+  }
+
+  if (normalizeRole(req.user.role) !== 'admin') {
+    res.status(403).json({
+      status: 'error',
+      message: 'Access denied. Admin role required.',
+    });
+    return;
+  }
+
+  next();
+};
+

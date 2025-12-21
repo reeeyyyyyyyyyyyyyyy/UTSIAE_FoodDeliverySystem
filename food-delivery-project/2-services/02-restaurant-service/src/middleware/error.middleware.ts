@@ -11,8 +11,23 @@ export const errorHandler = (
   err: Error,
   _req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ) => {
+  // Ignore request aborted errors (client disconnected)
+  if (err.message && err.message.includes('request aborted')) {
+    return; // Don't send response if request was aborted
+  }
+
+  // Ignore ECONNRESET errors (connection reset by client)
+  if ((err as any).code === 'ECONNRESET') {
+    return; // Don't send response if connection was reset
+  }
+
+  // Check if response was already sent
+  if (res.headersSent) {
+    return next(err);
+  }
+
   // Log error ke konsol untuk debugging
   console.error('❌ An unexpected error occurred:');
   console.error(err.stack);

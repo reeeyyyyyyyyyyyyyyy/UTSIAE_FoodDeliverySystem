@@ -1,16 +1,21 @@
 import express, { Express, Request, Response } from 'express';
+import { ApolloServer } from 'apollo-server-express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import jwt, { Secret } from 'jsonwebtoken';
 import swaggerUi from 'swagger-ui-express';
 import { connectToDatabase } from './database/connection'; // Fungsi baru yang di-await
 import { swaggerSpec } from './config/swagger'; // INI SEKARANG AKAN DITEMUKAN
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import { errorHandler } from './middleware/error.middleware';
+import { userTypeDefs } from './graphql/schema/user.schema';
+import { resolvers } from './graphql/resolvers';
 
 dotenv.config();
 
 const app: Express = express();
+const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Normalize Content-Type charset to avoid body-parser errors with quoted uppercase UTF-8
 app.use((req: Request, _res: Response, next) => {
@@ -36,6 +41,7 @@ app.get('/', (_req: Request, res: Response) => {
   res.json({
     message: 'User Service API',
     version: '1.0.0',
+    graphql: '/graphql',
     endpoints: {
       health: '/health',
       login: '/auth/login',
@@ -63,6 +69,31 @@ app.use((req: Request, res: Response, next) => {
   next();
 });
 
+// JWT Context Middleware for GraphQL
+interface UserContext {
+  id: number;
+  email: string;
+  role: string;
+}
+
+const context = ({ req }: { req: any }) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  let user: UserContext | null = null;
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as UserContext;
+      user = decoded;
+    } catch (error) {
+      console.error('Invalid token:', error);
+    }
+  }
+
+  return { user };
+};
+
 // ROUTES
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
@@ -78,9 +109,24 @@ async function startServer() {
     // 1. Hubungkan dan inisialisasi database DULU
     await connectToDatabase();
 
-    // 2. SETELAH database siap, baru jalankan server
+    // 2. Create Apollo Server
+    const server = new ApolloServer({
+      typeDefs: userTypeDefs,
+      resolvers,
+      context,
+      introspection: false,
+    });
+
+    // 3. Start Apollo Server
+    await server.start();
+
+    // 4. Apply middleware
+    server.applyMiddleware({ app: app as any, path: '/graphql' });
+
+    // 5. SETELAH database dan Apollo siap, baru jalankan server
     app.listen(PORT, () => {
       console.log(`🚀 User Service running on port ${PORT}`);
+      console.log(`📊 GraphQL endpoint: http://localhost:${PORT}/graphql`);
       console.log(`📚 Swagger docs: http://localhost:${PORT}/api-docs`);
       console.log(`❤️  Health check: http://localhost:${PORT}/health`);
     });

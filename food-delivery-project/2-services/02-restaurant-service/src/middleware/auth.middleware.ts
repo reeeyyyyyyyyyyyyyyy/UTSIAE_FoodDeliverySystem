@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { Secret } from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
 const normalizeRole = (role?: string) => (role ? role.toLowerCase() : undefined);
 
 interface JwtPayload {
@@ -28,14 +29,13 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   // Also check X-User-Id header (from API Gateway)
   const userId = req.headers['x-user-id'];
   const userEmail = req.headers['x-user-email'] as string;
-  const userRole = req.headers['x-user-role'] as string;
 
   if (userId && userEmail) {
     // Request comes from API Gateway with user info
     req.user = {
       id: parseInt(userId as string),
       email: userEmail,
-      role: userRole,
+      role: req.headers['x-user-role'] as string,
     };
     next();
     return;
@@ -81,3 +81,27 @@ export const authorizeAdmin = (req: Request, res: Response, next: NextFunction):
   next();
 };
 
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  const userId = req.headers['x-user-id'];
+  const userEmail = req.headers['x-user-email'] as string;
+
+  if (userId && userEmail) {
+    req.user = {
+      id: parseInt(userId as string),
+      email: userEmail,
+      role: req.headers['x-user-role'] as string,
+    };
+  } else if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+      req.user = decoded;
+    } catch (error) {
+      // Ignore error for optional auth
+    }
+  }
+
+  next();
+};
